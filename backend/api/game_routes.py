@@ -1,0 +1,73 @@
+"""Game session API routes."""
+from __future__ import annotations
+
+import asyncio
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+
+from backend.services import game_service
+
+router = APIRouter(prefix="/api/games", tags=["games"])
+
+
+class GameCreate(BaseModel):
+    agent_ids: list[str]
+    small_blind: int = 50
+    big_blind: int = 100
+    buy_in: int = 5000
+    num_hands: int = 10
+
+
+@router.post("")
+def create_game(body: GameCreate):
+    try:
+        session = game_service.create_game(
+            agent_ids=body.agent_ids,
+            small_blind=body.small_blind,
+            big_blind=body.big_blind,
+            buy_in=body.buy_in,
+        )
+        return {"session_id": session.session_id, "status": session.status}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/{session_id}/start")
+async def start_game(session_id: str, background_tasks: BackgroundTasks, num_hands: int = 10):
+    session = game_service.get_session(session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    if session.status != "waiting":
+        raise HTTPException(400, f"Session is {session.status}, cannot start")
+
+    # Run game in background so the API returns immediately
+    background_tasks.add_task(game_service.run_game, session_id, num_hands)
+    return {"session_id": session_id, "status": "starting", "num_hands": num_hands}
+
+
+@router.get("")
+def list_games():
+    return game_service.list_sessions()
+
+
+@router.get("/{session_id}")
+def get_game(session_id: str):
+    session = game_service.get_session(session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    return {
+        "session_id": session.session_id,
+        "status": session.status,
+        "total_hands_played": len(session.hand_results),
+        "current_chips": {
+            p.player_id: p.chips for p in session.game.players
+        },
+    }
+
+
+@router.get("/{session_id}/hands")
+def get_game_hands(session_id: str):
+    session = game_service.get_session(session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    return session.hand_results

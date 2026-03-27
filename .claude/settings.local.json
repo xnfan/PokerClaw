@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pypi.org)",
+      "Bash(python -m pytest backend/tests/ -v --tb=short)",
+      "Bash(where python:*)",
+      "Bash(C:python39python.exe -m pytest \"c:\\\\Users\\\\X1C-G9\\\\Documents\\\\claudecode\\\\PokerClaw\\\\backend\\\\tests\" -v --tb=short)",
+      "Bash(\"/c/python39/python.exe\" -m pytest \"c:\\\\Users\\\\X1C-G9\\\\Documents\\\\claudecode\\\\PokerClaw\\\\backend\\\\tests\" -v --tb=short)",
+      "Bash(npm --version)",
+      "Bash(npm create:*)"
+    ]
+  }
+}
