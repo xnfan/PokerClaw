@@ -7,24 +7,23 @@
 PokerClaw 是一个基于大语言模型（LLM）的德州扑克 Agent 竞技平台。用户可以创建、配置并持久化 AI Agent，让它们在不同规则的德扑牌局中自主对战或与人类玩家竞技。
 
 **核心特性：**
-- 可配置性格的 LLM Agent（新手/中级/高手 × LAG/TAG/鱼/石头）
-- 现金局模式（支持人机对战）
+- 可配置性格的 LLM Agent（新手/中级/高手 × TAG/LAG/鱼/石头/跟注站/疯子）
+- 现金局模式（Agent 自动对战）
 - 完整的牌局回放与 Agent 思维过程展示
-- 手牌实验室：预设场景测试 Agent 决策
-- LLM 调用监控（Token、耗时、成功率）
-- Agent 历史学习（短期摘要 + 长期 RAG）
-- GTO 策略辅助参考
+- 回放手牌可见性控制（全显示/全隐藏/单独控制）
+- LLM 调用监控（Token、耗时、成功率、P95 延迟）
+- 实时 WebSocket 推送牌局更新
+- 77+ 单元测试覆盖核心逻辑
 
 ## 技术栈
 
 | 层级 | 技术 |
 |------|------|
-| 后端 | Python 3.11+, FastAPI, WebSocket |
-| 数据库 | SQLite (预留 PostgreSQL 支持) |
-| 前端 | React 18, TypeScript, Vite, Tailwind CSS |
-| 手牌评估 | 自建评估器 + Monte Carlo Equity |
-| LLM | Anthropic Claude (可扩展其他 Provider) |
-| 向量存储 | SQLite + numpy 余弦相似度 |
+| 后端 | Python 3.11+, FastAPI, SQLAlchemy, WebSocket |
+| 数据库 | SQLite |
+| 前端 | React 18, TypeScript, Vite |
+| 手牌评估 | 自建评估器（10种牌型、7选5比较）|
+| LLM | Anthropic Claude / Mock Provider |
 
 ## 快速开始
 
@@ -35,10 +34,14 @@ PokerClaw 是一个基于大语言模型（LLM）的德州扑克 Agent 竞技平
 cd PokerClaw
 
 # 安装依赖
-pip install -r backend/requirements.txt
+pip install fastapi uvicorn websockets sqlalchemy pydantic anthropic
 
-# 启动服务
-uvicorn backend.main:app --reload --port 8000
+# 启动服务（Windows）
+set PYTHONPATH=c:\Users\X1C-G9\Documents\claudecode\PokerClaw
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+
+# 或 Linux/Mac
+PYTHONPATH=/path/to/PokerClaw python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 前端启动
@@ -50,7 +53,7 @@ cd frontend
 npm install
 
 # 启动开发服务器
-npm run dev
+npm run dev -- --host
 ```
 
 访问 http://localhost:5173 即可使用。
@@ -60,61 +63,131 @@ npm run dev
 ```
 PokerClaw/
 ├── backend/              # 后端服务
-│   ├── engine/           # 德扑规则引擎
-│   ├── agent/            # Agent 系统
-│   ├── llm/              # LLM Provider 适配器
-│   ├── monitoring/       # 监控与指标
-│   ├── api/              # REST API & WebSocket
-│   ├── services/         # 业务逻辑服务
-│   ├── database.py       # Schema 待完善
+│   ├── engine/           # 德扑规则引擎（Card, Deck, HandEvaluator, PotManager, BettingRound, GameRunner, CashGame）
+│   ├── agent/            # Agent 系统（BaseAgent, LLMAgent, Personality, ActionParser）
+│   ├── llm/              # LLM Provider 适配器（Base, Anthropic, Mock）
+│   ├── monitoring/       # 监控与指标（AgentMonitor, LLMMetricsCollector, MetricsAggregator）
+│   ├── api/              # REST API & WebSocket 路由
+│   ├── services/         # 业务逻辑服务（GameService）
+│   ├── database.py       # SQLite 数据库初始化
 │   ├── main.py           # FastAPI 入口
-│   └── tests/            # 测试套件
+│   └── tests/            # 77+ 测试套件
 ├── frontend/             # React 前端
-├── docs/                 # 项目文档
-├── review/               # Review 报告
-└── scripts/              # 工具脚本
+│   ├── src/pages/        # 6个页面（Dashboard, AgentManage, GameSetup, GamePlay, Replay, Monitoring）
+│   └── src/api/          # API 客户端
+├── docs/                 # 项目文档（PRD, SYSTEM_DESIGN, TEST_ANALYSIS）
+├── scripts/              # 工具脚本（run_cli_game.py）
+└── PROCESS.md            # 开发进度跟踪
 ```
 
-## 当前进度
+## 已实现功能
 
-### 已实现
+### Phase 1: 引擎核心 ✅
+- [x] Card, Deck, HandEvaluator（10种牌型评估 + 7选5）
+- [x] PotManager（底池 + 边池计算）
+- [x] BettingRound（下注轮次逻辑，4次加注上限）
+- [x] GameState（牌局状态管理）
+- [x] GameRunner（单手牌执行器）
+- [x] CashGame（多手牌现金局）
 
-| 模块 | 状态 | 说明 |
-|------|------|------|
-| 德扑引擎 | 核心完成 | 发牌、下注、边池计算 |
-| 手牌评估 | 完成 | 牌型判断、胜负比较 |
-| LLM Agent | 核心完成 | 决策、解析、超时兜底 |
-| Agent 性格 | 完成 | 5种风格模板 |
-| 监控指标 | 基础完成 | Token、耗时、成功率统计 |
-| API 接口 | 基础完成 | REST + WebSocket |
+### Phase 2: Agent 系统 ✅
+- [x] BaseAgent 接口
+- [x] LLMAgent（30秒超时 + 1次重试 + fallback）
+- [x] Personality 模板（6种风格 × 3个等级）
+- [x] ActionParser（LLM 输出解析）
+- [x] MockLLMProvider（测试用）
+- [x] AnthropicProvider（Claude API）
 
-### 待实现/优化
+### Phase 3: 数据持久化 + API ✅
+- [x] SQLite 数据库（agents, sessions, hands, llm_logs, decisions 表）
+- [x] FastAPI REST 接口
+- [x] WebSocket 实时通信
+- [x] Agent CRUD API
+- [x] 游戏创建/启动/查询 API
+- [x] 监控指标 API
+
+### Phase 4: 前端 ✅
+- [x] React + TypeScript + Vite 项目
+- [x] Dashboard（统计概览）
+- [x] Agent 管理（创建/删除/配置）
+- [x] 游戏配置（选择 Agent、设置盲注）
+- [x] 游戏实况（牌桌 UI、WebSocket 更新、操作记录）
+- [x] **回放页面（步骤导航、手牌显示控制）**
+- [x] 监控中心（Provider 状态、Agent 指标）
+
+### Phase 5: 修复与优化 ✅
+- [x] 游戏速度调整（800ms 延迟，可观看）
+- [x] Agent 名字显示修复（display_name 替代 UUID）
+- [x] 回放手牌可见性控制（全显/全隐/单独控制）
+
+## 待实现功能
 
 | 模块 | 优先级 | 状态 |
 |------|--------|------|
-| 手牌实验室 (hand_lab) | P0 | 未开始 |
-| 人机对战 (human_agent) | P0 | 未开始 |
-| 锦标赛模式 (tournament) | P1 | 未开始 |
-| 学习系统 (learning/) | P1 | 空目录 |
-| GTO 辅助 (gto/) | P1 | 空目录 |
-
-## 已知问题
-
-1. **PotManager 边池计算** - 多人 all-in 场景下底池分配逻辑需优化
-2. **数据库 Schema** - 实际实现(5表)与设计文档(11表)存在差距
-
-详见 [review/SYSTEM_DESIGN_REVIEW.md](review/SYSTEM_DESIGN_REVIEW.md)
+| 手牌实验室 (Hand Lab) | P1 | 未开始 |
+| 人机对战 (Human Agent) | P1 | 未开始 |
+| 锦标赛模式 (Tournament) | P2 | 未开始 |
+| Agent 学习系统 (Learning) | P2 | 未开始 |
+| GTO 策略辅助 | P2 | 未开始 |
 
 ## 运行测试
 
 ```bash
 # 运行所有测试
-pytest backend/tests/ -v
+python -m pytest backend/tests/ -v
+
+# 运行特定模块测试
+python -m pytest backend/tests/test_engine.py -v
+python -m pytest backend/tests/test_agent.py -v
 ```
+
+## API 端点
+
+- `GET /` - 服务状态
+- `GET /docs` - Swagger 文档
+
+### Agent
+- `GET /api/agents` - 列出所有 Agent
+- `POST /api/agents` - 创建 Agent
+- `GET /api/agents/{id}` - 获取 Agent 详情
+- `PUT /api/agents/{id}` - 更新 Agent
+- `DELETE /api/agents/{id}` - 删除 Agent
+
+### 游戏
+- `GET /api/games` - 列出所有游戏
+- `POST /api/games` - 创建游戏
+- `GET /api/games/{session_id}` - 获取游戏状态
+- `POST /api/games/{session_id}/start` - 开始游戏
+- `GET /api/games/{session_id}/hands` - 获取手牌记录
+
+### 回放
+- `GET /api/replay/sessions/{session_id}` - 获取会话手牌列表
+- `GET /api/replay/hands/{hand_id}` - 获取手牌详情（含 player_cards）
+
+### 监控
+- `GET /api/monitoring/overview` - 全局概览
+- `GET /api/monitoring/agents/{agent_id}` - Agent 指标
+- `GET /api/monitoring/providers` - Provider 状态
+
+### WebSocket
+- `WS /ws/games/{session_id}` - 实时游戏更新
 
 ## 文档索引
 
 - [产品需求文档 (PRD)](docs/PRD.md) - 功能需求、用户故事、里程碑
 - [系统设计文档](docs/SYSTEM_DESIGN.md) - 架构设计、数据库 Schema、API 设计
 - [测试策略文档](docs/TEST_ANALYSIS.md) - 测试覆盖、测试用例
-- [设计 Review 报告](review/SYSTEM_DESIGN_REVIEW.md) - 问题分析、改进建议
+- [开发进度](PROCESS.md) - 任务跟踪、会话记录
+
+## 更新日志
+
+### 2026-03-29
+- MVP 完整实现（后端 + 前端）
+- 修复游戏速度问题（delay 10ms → 800ms）
+- 修复 Agent 名字显示（display_name 替代 UUID）
+- 新增回放页面手牌可见性控制
+- 77+ 测试全部通过
+
+## License
+
+MIT License

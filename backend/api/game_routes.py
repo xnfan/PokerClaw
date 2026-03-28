@@ -60,7 +60,7 @@ def get_game(session_id: str):
         "status": session.status,
         "total_hands_played": len(session.hand_results),
         "current_chips": {
-            p.player_id: p.chips for p in session.game.players
+            p.display_name: p.chips for p in session.game.players
         },
     }
 

@@ -64,8 +64,9 @@ def create_agent_from_db(agent_id: str) -> LLMAgent:
             "tag": "aggressive", "lag": "aggressive", "rock": "passive",
             "calling_station": "passive", "fish": "random", "maniac": "aggressive",
         }
+        # Add delay to simulate LLM thinking and make game watchable
         provider = MockLLMProvider(
-            style=mock_map.get(row["play_style"], "random"), delay_ms=10
+            style=mock_map.get(row["play_style"], "random"), delay_ms=800
         )
 
     return LLMAgent(
@@ -163,18 +164,31 @@ def list_sessions() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def _get_agent_name(agent_id: str) -> str:
+    """Get display_name for an agent from DB."""
+    db = get_db()
+    row = db.execute("SELECT display_name FROM agents WHERE agent_id=?", (agent_id,)).fetchone()
+    db.close()
+    return row["display_name"] if row else agent_id
+
+
 def _serialize_hand(result: HandResult, session_id: str, hand_num: int) -> dict:
+    # Map agent IDs to display names for frontend readability
+    name_map = {}
+    for pid in result.final_chips.keys():
+        name_map[pid] = _get_agent_name(pid)
+
     return {
         "hand_id": result.hand_id,
         "session_id": session_id,
         "hand_number": hand_num,
         "community_cards": [str(c) for c in result.community_cards],
         "pot_total": sum(result.winners.values()),
-        "winners": result.winners,
-        "final_chips": result.final_chips,
+        "winners": {name_map.get(k, k): v for k, v in result.winners.items()},
+        "final_chips": {name_map.get(k, k): v for k, v in result.final_chips.items()},
         "actions": [
             {
-                "player_id": a.player_id,
+                "player_id": a.player_id,  # Already display_name from game_runner
                 "street": a.street,
                 "action": a.action,
                 "amount": a.amount,
@@ -190,7 +204,10 @@ def _serialize_hand(result: HandResult, session_id: str, hand_num: int) -> dict:
             for a in result.action_history
         ],
         "player_hands": {
-            pid: str(score) for pid, score in result.player_hands.items()
+            name_map.get(pid, pid): str(score) for pid, score in result.player_hands.items()
+        },
+        "player_cards": {
+            name_map.get(pid, pid): [str(c) for c in cards] for pid, cards in result.player_cards.items()
         },
     }
 
@@ -198,13 +215,14 @@ def _serialize_hand(result: HandResult, session_id: str, hand_num: int) -> dict:
 def _save_hand_to_db(hand: dict) -> None:
     db = get_db()
     db.execute(
-        "INSERT OR REPLACE INTO hand_records (hand_id, session_id, hand_number, community_cards, pot_total, winners_json, actions_json, started_at) VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT OR REPLACE INTO hand_records (hand_id, session_id, hand_number, community_cards, pot_total, winners_json, actions_json, player_cards_json, started_at) VALUES (?,?,?,?,?,?,?,?,?)",
         (
             hand["hand_id"], hand["session_id"], hand["hand_number"],
             json.dumps(hand["community_cards"]),
             hand["pot_total"],
             json.dumps(hand["winners"]),
             json.dumps(hand["actions"]),
+            json.dumps(hand.get("player_cards", {})),
             now_iso(),
         ),
     )

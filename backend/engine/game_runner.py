@@ -73,6 +73,8 @@ class GameRunner:
             big_blind=big_blind,
             dealer_index=dealer_index,
         )
+        # Map player_id to display_name for readable action history
+        self._player_names: dict[str, str] = {p.player_id: p.display_name for p in players}
         self.action_history: list[ActionRecord] = []
 
     async def run_hand(self) -> HandResult:
@@ -167,9 +169,10 @@ class GameRunner:
                 action = PlayerAction(next_pid, BettingAction.FOLD)
             betting.apply_action(action)
             self._sync_seats_back(ordered_seats)
-            # Record action
+            # Record action (use display_name for readability)
+            display_name = self._player_names.get(next_pid, next_pid)
             record = ActionRecord(
-                player_id=next_pid,
+                player_id=display_name,
                 street=street.value,
                 action=action.action.value,
                 amount=action.amount,

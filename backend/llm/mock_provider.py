@@ -91,6 +91,12 @@ class MockLLMProvider(BaseLLMProvider):
         )
 
     def _aggressive_response(self, context: str) -> str:
+        import random
+        # 50% chance to call/check to let game proceed to flop
+        if random.random() < 0.5:
+            if "check" in context.lower():
+                return "THINKING: 看看公共牌\nACTION: check"
+            return "THINKING: 跟注看翻牌\nACTION: call"
         if "raise" in context.lower() or "call" in context.lower():
             return "THINKING: 我要施压！\nACTION: raise\nAMOUNT: 300"
         return "THINKING: 先加注看看\nACTION: raise\nAMOUNT: 200"

@@ -37,6 +37,12 @@ def get_hand_detail(hand_id: str):
     db.close()
     if not row:
         raise HTTPException(404, "Hand not found")
+    player_cards = {}
+    if row["player_cards_json"]:
+        try:
+            player_cards = json.loads(row["player_cards_json"])
+        except json.JSONDecodeError:
+            player_cards = {}
     return {
         "hand_id": row["hand_id"],
         "session_id": row["session_id"],
@@ -45,4 +51,5 @@ def get_hand_detail(hand_id: str):
         "pot_total": row["pot_total"],
         "winners": json.loads(row["winners_json"]),
         "actions": json.loads(row["actions_json"]),
+        "player_cards": player_cards,
     }

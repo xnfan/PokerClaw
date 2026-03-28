@@ -38,14 +38,15 @@ CREATE TABLE IF NOT EXISTS game_sessions (
 );
 
 CREATE TABLE IF NOT EXISTS hand_records (
-    hand_id         TEXT PRIMARY KEY,
-    session_id      TEXT NOT NULL,
-    hand_number     INTEGER NOT NULL,
-    community_cards TEXT DEFAULT '[]',
-    pot_total       INTEGER DEFAULT 0,
-    winners_json    TEXT DEFAULT '{}',
-    actions_json    TEXT DEFAULT '[]',
-    started_at      TEXT NOT NULL
+    hand_id           TEXT PRIMARY KEY,
+    session_id        TEXT NOT NULL,
+    hand_number       INTEGER NOT NULL,
+    community_cards   TEXT DEFAULT '[]',
+    pot_total         INTEGER DEFAULT 0,
+    winners_json      TEXT DEFAULT '{}',
+    actions_json      TEXT DEFAULT '[]',
+    player_cards_json TEXT DEFAULT '{}',
+    started_at        TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS llm_call_logs (
