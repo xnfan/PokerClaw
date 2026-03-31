@@ -7,6 +7,7 @@ export default function GameSetupPage() {
   const [agents, setAgents] = useState<any[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [config, setConfig] = useState({ small_blind: 50, big_blind: 100, buy_in: 5000, num_hands: 10 });
+  const [unlimited, setUnlimited] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { api.listAgents().then(setAgents).catch(() => {}); }, []);
@@ -19,8 +20,9 @@ export default function GameSetupPage() {
     if (selected.length < 2) { alert('Select at least 2 agents'); return; }
     setLoading(true);
     try {
+      const numHands = unlimited ? 999999 : config.num_hands;
       const { session_id } = await api.createGame({ agent_ids: selected, ...config });
-      await api.startGame(session_id, config.num_hands);
+      await api.startGame(session_id, numHands);
       navigate(`/games/${session_id}`);
     } catch (e: any) { alert(e.message); }
     setLoading(false);
@@ -47,7 +49,23 @@ export default function GameSetupPage() {
           </div>
           <div>
             <label>Number of Hands</label>
-            <input type="number" value={config.num_hands} onChange={e => setConfig({...config, num_hands: +e.target.value})} />
+            <div style={{display: 'flex', alignItems: 'center', gap: 8, marginTop: 4}}>
+              <label style={{display: 'flex', alignItems: 'center', gap: 4, margin: 0, cursor: 'pointer'}}>
+                <input type="radio" checked={!unlimited} onChange={() => setUnlimited(false)} />
+                <span>Set:</span>
+              </label>
+              <input
+                type="number"
+                value={config.num_hands}
+                onChange={e => setConfig({...config, num_hands: +e.target.value})}
+                disabled={unlimited}
+                style={{width: 80, opacity: unlimited ? 0.4 : 1}}
+              />
+              <label style={{display: 'flex', alignItems: 'center', gap: 4, margin: 0, cursor: 'pointer'}}>
+                <input type="radio" checked={unlimited} onChange={() => setUnlimited(true)} />
+                <span>Unlimited</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>

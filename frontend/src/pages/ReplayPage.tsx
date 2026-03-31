@@ -69,6 +69,24 @@ export default function ReplayPage() {
     <div>
       <h1 className="page-title">Replay: Hand {hand.hand_id}</h1>
 
+      {/* Chip Changes Summary */}
+      {hand.chip_changes && (
+        <div className="card" style={{marginBottom: 16}}>
+          <h2>Chip Changes</h2>
+          <div style={{display: 'flex', gap: 20, flexWrap: 'wrap'}}>
+            {Object.entries(hand.chip_changes).map(([pid, change]: [string, any]) => (
+              <div key={pid} style={{textAlign: 'center'}}>
+                <div style={{fontWeight: 600, fontSize: '0.9rem'}}>{pid}</div>
+                <div className={change > 0 ? 'text-green' : change < 0 ? 'text-red' : 'text-yellow'}
+                  style={{fontSize: '1.1rem', fontWeight: 700}}>
+                  {change > 0 ? `+${change}` : change}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Board with Player Hands */}
       <div className="poker-table" style={{minHeight: 320, position: 'relative'}}>
         <div className="pot-display">Pot: {currentAction?.pot_after || 0}</div>
@@ -163,6 +181,9 @@ export default function ReplayPage() {
                 <tr><td>Player</td><td><strong>{currentAction.player_id}</strong></td></tr>
                 <tr><td>Street</td><td>{currentAction.street}</td></tr>
                 <tr><td>Action</td><td><span className={`badge badge-${currentAction.action}`}>{currentAction.action}</span> {currentAction.amount > 0 && currentAction.amount}</td></tr>
+                {currentAction.round_bet > 0 && (
+                  <tr><td>Round Bet</td><td className="text-cyan">{currentAction.round_bet}</td></tr>
+                )}
                 <tr><td>Pot After</td><td className="text-yellow">{currentAction.pot_after}</td></tr>
                 {currentAction.is_timeout && <tr><td>Status</td><td className="text-red">TIMEOUT (auto-fold)</td></tr>}
                 {currentAction.input_tokens > 0 && (
@@ -198,6 +219,7 @@ export default function ReplayPage() {
               <span style={{width:90}}>{a.player_id}</span>
               <span className={`badge badge-${a.action}`}>{a.action}</span>
               {a.amount > 0 && <span className="text-yellow" style={{marginLeft:4}}>{a.amount}</span>}
+              {a.round_bet > 0 && <span style={{marginLeft:4, fontSize:'0.75rem', color:'#94a3b8'}}>R:{a.round_bet}</span>}
               {a.is_timeout && <span className="text-red" style={{marginLeft:4}}>[TIMEOUT]</span>}
             </div>
           ))}

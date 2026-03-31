@@ -52,4 +52,5 @@ def get_hand_detail(hand_id: str):
         "winners": json.loads(row["winners_json"]),
         "actions": json.loads(row["actions_json"]),
         "player_cards": player_cards,
+        "chip_changes": json.loads(row["chip_changes_json"]) if row["chip_changes_json"] else {},
     }

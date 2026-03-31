@@ -237,7 +237,7 @@ def _serialize_hand(result: HandResult, session_id: str, hand_num: int) -> dict:
 def _save_hand_to_db(hand: dict) -> None:
     db = get_db()
     db.execute(
-        "INSERT OR REPLACE INTO hand_records (hand_id, session_id, hand_number, community_cards, pot_total, winners_json, actions_json, player_cards_json, started_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT OR REPLACE INTO hand_records (hand_id, session_id, hand_number, community_cards, pot_total, winners_json, actions_json, player_cards_json, chip_changes_json, started_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         (
             hand["hand_id"], hand["session_id"], hand["hand_number"],
             json.dumps(hand["community_cards"]),
@@ -245,6 +245,7 @@ def _save_hand_to_db(hand: dict) -> None:
             json.dumps(hand["winners"]),
             json.dumps(hand["actions"]),
             json.dumps(hand.get("player_cards", {})),
+            json.dumps(hand.get("chip_changes", {})),
             now_iso(),
         ),
     )

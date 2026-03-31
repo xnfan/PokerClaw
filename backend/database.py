@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS hand_records (
     winners_json      TEXT DEFAULT '{}',
     actions_json      TEXT DEFAULT '[]',
     player_cards_json TEXT DEFAULT '{}',
+    chip_changes_json TEXT DEFAULT '{}',
     started_at        TEXT NOT NULL
 );
 
@@ -89,6 +90,11 @@ def get_db(db_path: str | None = None) -> sqlite3.Connection:
 def init_db(db_path: str | None = None) -> None:
     conn = get_db(db_path)
     conn.executescript(_SCHEMA)
+    # Migration: add chip_changes_json column if missing
+    try:
+        conn.execute("ALTER TABLE hand_records ADD COLUMN chip_changes_json TEXT DEFAULT '{}'")
+    except Exception:
+        pass  # column already exists
     conn.commit()
     conn.close()
 

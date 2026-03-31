@@ -113,3 +113,12 @@ th { color: #94a3b8; font-weight: 600; }
 .text-red { color: #f87171; }
 .text-yellow { color: #fbbf24; }
 .text-cyan { color: #22d3ee; }
+
+/* Thinking indicator */
+.seat-thinking { border-color: #22d3ee; box-shadow: 0 0 12px #22d3ee44; }
+.thinking-dot { color: #22d3ee; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Chip changes */
+.chip-change-positive { color: #4ade80; font-size: 0.85rem; font-weight: 600; }
+.chip-change-negative { color: #f87171; font-size: 0.85rem; font-weight: 600; }

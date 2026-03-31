@@ -26,6 +26,7 @@ export const api = {
   listGames: () => request<any[]>('/api/games'),
   getGame: (sessionId: string) => request<any>(`/api/games/${sessionId}`),
   getGameHands: (sessionId: string) => request<any[]>(`/api/games/${sessionId}/hands`),
+  stopGame: (sessionId: string) => request<any>(`/api/games/${sessionId}/stop`, { method: 'POST' }),
 
   // Replay
   getHandDetail: (handId: string) => request<any>(`/api/replay/hands/${handId}`),
