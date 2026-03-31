@@ -51,6 +51,8 @@ class HandResult:
     community_cards: list[Card]
     action_history: list[ActionRecord]
     final_chips: dict[str, int]  # player_id -> chips after hand
+    starting_chips: dict[str, int] = field(default_factory=dict)
+    chip_changes: dict[str, int] = field(default_factory=dict)
 
 
 class GameRunner:

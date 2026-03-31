@@ -79,14 +79,23 @@ class CashGame:
         self,
         num_hands: int,
         on_hand_complete: Any = None,
+        on_action: Any = None,
+        stop_event: Any = None,
     ) -> SessionResult:
         """Run a session of num_hands hands."""
         if len(self.players) < 2:
             raise ValueError("Need at least 2 players")
 
         for _ in range(num_hands):
+            # Check for stop signal
+            if stop_event and stop_event.is_set():
+                break
+            # Capture starting chips before the hand
+            starting_chips = {p.player_id: p.chips for p in self.players}
             # Reset per-hand state for each player
             hand_players = self._prepare_hand_players()
+            if len(hand_players) < 2:
+                break  # Not enough players to continue
             active_agents = {
                 p.player_id: self.agents[p.player_id] for p in hand_players
             }
@@ -97,12 +106,22 @@ class CashGame:
                 big_blind=self.config.big_blind,
                 dealer_index=self.dealer_index % len(hand_players),
             )
+            # Pass action callback to runner
+            if on_action:
+                runner.on_action = on_action
             result = await runner.run_hand()
             self.hand_results.append(result)
             # Sync chips back to session players
             for p in self.players:
                 if p.player_id in result.final_chips:
                     p.chips = result.final_chips[p.player_id]
+            # Compute chip changes
+            chip_changes = {}
+            for p in self.players:
+                start = starting_chips.get(p.player_id, 0)
+                chip_changes[p.player_id] = p.chips - start
+            result.starting_chips = starting_chips
+            result.chip_changes = chip_changes
             self.dealer_index = (self.dealer_index + 1) % len(self.players)
             self._hand_count += 1
             if on_hand_complete:
