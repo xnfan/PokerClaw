@@ -39,6 +39,7 @@ class GameSession:
     status: str = "waiting"  # waiting / running / finished
     hand_results: list[dict] = field(default_factory=list)
     on_event: Callable | None = None  # WebSocket broadcast callback
+    stop_event: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 def create_agent_from_db(agent_id: str) -> LLMAgent:
@@ -133,7 +134,16 @@ async def run_game(session_id: str, num_hands: int = 10) -> dict:
         if session.on_event:
             await session.on_event({"type": "hand_complete", "data": hand_data})
 
-    result = await session.game.run(num_hands, on_hand_complete=on_hand_complete)
+    async def on_action(event: dict) -> None:
+        if session.on_event:
+            await session.on_event(event)
+
+    result = await session.game.run(
+        num_hands,
+        on_hand_complete=on_hand_complete,
+        on_action=on_action,
+        stop_event=session.stop_event,
+    )
     session.status = "finished"
 
     db = get_db()
@@ -153,6 +163,15 @@ async def run_game(session_id: str, num_hands: int = 10) -> dict:
 
 def get_session(session_id: str) -> GameSession | None:
     return _active_games.get(session_id)
+
+
+def stop_game(session_id: str) -> bool:
+    """Signal a running game to stop after the current hand."""
+    session = _active_games.get(session_id)
+    if not session:
+        return False
+    session.stop_event.set()
+    return True
 
 
 def list_sessions() -> list[dict]:
@@ -192,6 +211,7 @@ def _serialize_hand(result: HandResult, session_id: str, hand_num: int) -> dict:
                 "street": a.street,
                 "action": a.action,
                 "amount": a.amount,
+                "round_bet": a.round_bet,
                 "pot_after": a.pot_after,
                 "thinking": a.thinking,
                 "is_timeout": a.is_timeout,
@@ -209,6 +229,8 @@ def _serialize_hand(result: HandResult, session_id: str, hand_num: int) -> dict:
         "player_cards": {
             name_map.get(pid, pid): [str(c) for c in cards] for pid, cards in result.player_cards.items()
         },
+        "starting_chips": {name_map.get(k, k): v for k, v in result.starting_chips.items()},
+        "chip_changes": {name_map.get(k, k): v for k, v in result.chip_changes.items()},
     }
 
 
