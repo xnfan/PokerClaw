@@ -45,6 +45,14 @@ async def start_game(session_id: str, background_tasks: BackgroundTasks, num_han
     return {"session_id": session_id, "status": "starting", "num_hands": num_hands}
 
 
+@router.post("/{session_id}/stop")
+def stop_game(session_id: str):
+    success = game_service.stop_game(session_id)
+    if not success:
+        raise HTTPException(404, "Session not found or not running")
+    return {"session_id": session_id, "status": "stopping"}
+
+
 @router.get("")
 def list_games():
     return game_service.list_sessions()
