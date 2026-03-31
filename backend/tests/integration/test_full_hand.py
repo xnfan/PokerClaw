@@ -85,3 +85,28 @@ class TestFullHand:
         for hand in result.hand_results:
             total = sum(hand.final_chips.values())
             assert total == 20000
+
+    async def test_chip_changes_per_hand(self):
+        """Each hand should report chip_changes that sum to zero."""
+        game, _ = _create_game(num_players=3)
+        result = await game.run(3)
+        for hand in result.hand_results:
+            assert hasattr(hand, 'chip_changes')
+            assert len(hand.chip_changes) > 0
+            # Chip changes across all players should sum to zero
+            total_change = sum(hand.chip_changes.values())
+            assert total_change == 0, f"Chip changes don't sum to zero: {hand.chip_changes}"
+
+    async def test_on_action_callback_fires(self):
+        """on_action callback should be called during hand execution."""
+        game, _ = _create_game(num_players=2)
+        events = []
+
+        async def on_action(event):
+            events.append(event)
+
+        await game.run(1, on_action=on_action)
+        # Should have at least street_start, player_thinking, and player_action events
+        event_types = {e["type"] for e in events}
+        assert "player_thinking" in event_types
+        assert "player_action" in event_types
