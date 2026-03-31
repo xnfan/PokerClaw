@@ -208,7 +208,7 @@ export default function GamePlayPage() {
         <div className="card">
           <h2>Hands ({hands.length})</h2>
           <div className="timeline">
-            {hands.map((h, i) => (
+            {hands.map((h) => (
               <div key={h.hand_id} className="timeline-item" style={{cursor:'pointer'}}
                 onClick={() => setSelectedHand(h)}>
                 <span style={{width:30, color:'#64748b'}}>#{h.hand_number}</span>
