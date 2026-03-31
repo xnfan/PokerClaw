@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from backend.engine.betting_round import (
     BettingAction,
@@ -17,6 +17,9 @@ from backend.engine.game_state import GameState, PlayerState, Street
 from backend.engine.hand_evaluator import HandEvaluator, HandScore
 from backend.engine.pot_manager import PotManager
 
+# Callback type for real-time action events
+ActionCallback = Callable[[dict[str, Any]], Awaitable[None]]
+
 if TYPE_CHECKING:
     from backend.agent.base_agent import BaseAgent
 
@@ -27,7 +30,8 @@ class ActionRecord:
     player_id: str
     street: str
     action: str
-    amount: int
+    amount: int  # total amount put in this action
+    round_bet: int  # total amount player invested this round
     pot_after: int
     thinking: str = ""
     is_timeout: bool = False
@@ -75,6 +79,7 @@ class GameRunner:
         )
         # Map player_id to display_name for readable action history
         self._player_names: dict[str, str] = {p.player_id: p.display_name for p in players}
+        self.on_action: ActionCallback | None = None
         self.action_history: list[ActionRecord] = []
 
     async def run_hand(self) -> HandResult:
@@ -88,7 +93,7 @@ class GameRunner:
                 break
             self.state.street = street
             if street != Street.PREFLOP:
-                self._deal_community(street)
+                await self._deal_community(street)
                 for p in self.state.players:
                     p.reset_street_bet()
             if len(self.state.active_non_allin) > 0:
@@ -127,11 +132,21 @@ class GameRunner:
         for player in self.state.players:
             player.hole_cards = self.deck.deal(2)
 
-    def _deal_community(self, street: Street) -> None:
+    async def _deal_community(self, street: Street) -> None:
         if street == Street.FLOP:
             self.state.community_cards.extend(self.deck.deal(3))
         elif street in (Street.TURN, Street.RIVER):
             self.state.community_cards.extend(self.deck.deal(1))
+        if self.on_action:
+            await self.on_action({
+                "type": "street_start",
+                "data": {
+                    "hand_id": self.hand_id,
+                    "street": street.value,
+                    "community_cards": [str(c) for c in self.state.community_cards],
+                    "pot": self.state.pot_manager.total_pot,
+                },
+            })
 
     async def _run_betting_round(self, street: Street) -> None:
         """Run a full betting round for one street."""
@@ -161,14 +176,31 @@ class GameRunner:
             valid_actions = betting.get_valid_actions(next_pid)
             if not valid_actions:
                 break
+            # Emit player_thinking event
+            display_name = self._player_names.get(next_pid, next_pid)
+            if self.on_action:
+                await self.on_action({
+                    "type": "player_thinking",
+                    "data": {
+                        "hand_id": self.hand_id,
+                        "player_id": display_name,
+                        "street": street.value,
+                    },
+                })
             player_view = self.state.to_player_view(next_pid)
             agent = self.agents[next_pid]
             action, metadata = await agent.decide(player_view, valid_actions)
             # Ensure action is valid
             if action.action not in valid_actions:
                 action = PlayerAction(next_pid, BettingAction.FOLD)
+            # Get round_bet before applying action
+            seat_before = next((s for s in ordered_seats if s.player_id == next_pid), None)
+            round_bet_before = seat_before.current_bet if seat_before else 0
             betting.apply_action(action)
             self._sync_seats_back(ordered_seats)
+            # Get round_bet after action
+            round_bet_after = next((s.current_bet for s in ordered_seats if s.player_id == next_pid), 0)
+            round_invested = round_bet_after  # total invested this round for this player
             # Record action (use display_name for readability)
             display_name = self._player_names.get(next_pid, next_pid)
             record = ActionRecord(
@@ -176,6 +208,7 @@ class GameRunner:
                 street=street.value,
                 action=action.action.value,
                 amount=action.amount,
+                round_bet=round_invested,
                 pot_after=self.state.pot_manager.total_pot,
                 thinking=metadata.get("thinking", ""),
                 is_timeout=metadata.get("is_timeout", False),
@@ -186,6 +219,24 @@ class GameRunner:
                 decision_ms=metadata.get("decision_ms", 0.0),
             )
             self.action_history.append(record)
+            # Emit player_action event
+            if self.on_action:
+                await self.on_action({
+                    "type": "player_action",
+                    "data": {
+                        "hand_id": self.hand_id,
+                        "player_id": record.player_id,
+                        "street": record.street,
+                        "action": record.action,
+                        "amount": record.amount,
+                        "round_bet": record.round_bet,
+                        "pot_after": record.pot_after,
+                        "thinking": record.thinking,
+                        "input_tokens": record.input_tokens,
+                        "output_tokens": record.output_tokens,
+                        "llm_latency_ms": record.llm_latency_ms,
+                    },
+                })
 
     def _build_seats(self) -> list[PlayerSeat]:
         return [
