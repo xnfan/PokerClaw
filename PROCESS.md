@@ -149,6 +149,19 @@ npm run dev -- --host
   - Added 50% chance to call/check to allow game to proceed to flop/turn/river
 - Verified: community_cards now displays correctly in API response
 
+### Session 4 (Replay Enhancement - 2026-03-29)
+- Added player hole cards display to ReplayPage
+- Implemented hand visibility controls:
+  - Show All / Hide All buttons
+  - Individual checkbox for each player
+  - Cards displayed on poker table
+- Backend changes:
+  - Added player_cards_json column to hand_records table
+  - Updated _serialize_hand to include player_cards
+  - Updated replay_routes.py to return player_cards in API
+- Updated README.md with complete feature documentation
+- Pushed MVP to GitHub: https://github.com/xnfan/PokerClaw
+
 ### Next Session Focus
 - Implement Hand Lab for preset scenario testing
 - Add equity calculation (Monte Carlo)
