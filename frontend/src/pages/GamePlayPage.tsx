@@ -26,6 +26,7 @@ export default function GamePlayPage() {
   const [livePot, setLivePot] = useState(0);
   const [thinkingPlayer, setThinkingPlayer] = useState<string | null>(null);
   const [currentHandId, setCurrentHandId] = useState<string | null>(null);
+  const [livePlayerCards, setLivePlayerCards] = useState<Record<string, string[]>>({});
   const [stopping, setStopping] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const liveLogRef = useRef<HTMLDivElement>(null);
@@ -61,8 +62,15 @@ export default function GamePlayPage() {
         setLivePot(0);
         setThinkingPlayer(null);
         setCurrentHandId(null);
-      } else if (msg.type === 'street_start') {
+        setLivePlayerCards({});
+      } else if (msg.type === 'hand_start') {
         setCurrentHandId(msg.data.hand_id);
+        setLivePlayerCards(msg.data.players || {});
+        setLivePot(msg.data.pot || 0);
+        setLiveActions([]);
+        setLiveCommunity([]);
+        setThinkingPlayer(null);
+      } else if (msg.type === 'street_start') {
         setLiveCommunity(msg.data.community_cards || []);
         setLivePot(msg.data.pot || 0);
         setThinkingPlayer(null);
@@ -98,7 +106,7 @@ export default function GamePlayPage() {
 
   const lastHand = selectedHand || (hands.length > 0 ? hands[hands.length - 1] : null);
   const isRunning = game?.status === 'running';
-  const isLive = isRunning && (liveActions.length > 0 || thinkingPlayer);
+  const isLive = isRunning && (liveActions.length > 0 || thinkingPlayer || Object.keys(livePlayerCards).length > 0);
 
   // Use live community cards during active play, otherwise last hand's
   const displayCommunity = isLive ? liveCommunity : (lastHand?.community_cards || []);
@@ -142,18 +150,26 @@ export default function GamePlayPage() {
         )}
       </div>
 
-      {/* Seats with chip changes */}
+      {/* Seats with hole cards and chip changes */}
       {game?.current_chips && (
         <div className="seats-container">
           {Object.entries(game.current_chips).map(([pid, chips]) => {
             const isThinking = thinkingPlayer === pid;
             const chipChange = lastHand?.chip_changes?.[pid];
+            const liveCards = livePlayerCards[pid];
+            const isFolded = liveActions.some((a: any) => a.player_id === pid && a.action === 'fold');
             return (
-              <div key={pid} className={`seat ${isThinking ? 'seat-thinking' : ''}`}>
+              <div key={pid} className={`seat ${isThinking ? 'seat-thinking' : ''} ${isFolded ? 'seat-folded' : ''}`}>
                 <div className="name">
                   {pid}
                   {isThinking && <span className="thinking-dot"> ...</span>}
                 </div>
+                {/* Show hole cards during live play */}
+                {liveCards && liveCards.length > 0 && (
+                  <div className="hole-cards">
+                    {liveCards.map((c: string, i: number) => <CardView key={i} card={c} />)}
+                  </div>
+                )}
                 <div className="chips">{String(chips)} chips</div>
                 {chipChange != null && chipChange !== 0 && !isLive && (
                   <div className={chipChange > 0 ? 'chip-change-positive' : 'chip-change-negative'}>
@@ -197,8 +213,10 @@ export default function GamePlayPage() {
             </div>
           ) : thinkingPlayer ? (
             <p style={{color:'#94a3b8', padding: '12px'}}>{thinkingPlayer} is thinking...</p>
+          ) : Object.keys(livePlayerCards).length > 0 ? (
+            <p style={{color:'#94a3b8', padding: '12px'}}>Cards dealt, waiting for actions...</p>
           ) : (
-            <p className="empty-state">Waiting for actions...</p>
+            <p className="empty-state">Waiting for hand to start...</p>
           )}
         </div>
       )}

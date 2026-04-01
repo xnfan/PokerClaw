@@ -89,6 +89,24 @@ class GameRunner:
         self._post_blinds()
         self._deal_hole_cards()
 
+        # Emit hand_start event (spectator mode — show all hole cards)
+        if self.on_action:
+            await self.on_action({
+                "type": "hand_start",
+                "data": {
+                    "hand_id": self.hand_id,
+                    "players": {
+                        self._player_names[p.player_id]: {
+                            "chips": p.chips,
+                            "is_active": True,
+                            "hole_cards": [str(c) for c in p.hole_cards],
+                        }
+                        for p in self.state.players
+                    },
+                    "pot": self.state.pot_manager.total_pot,
+                },
+            })
+
         streets = [Street.PREFLOP, Street.FLOP, Street.TURN, Street.RIVER]
         for street in streets:
             if len(self.state.active_players) <= 1:
@@ -270,13 +288,20 @@ class GameRunner:
         hand_scores: dict[str, HandScore] = {}
         player_cards: dict[str, list[Card]] = {}
 
+        # Include ALL players' cards (folded players too) for spectator view
+        for p in self.state.players:
+            player_cards[p.player_id] = list(p.hole_cards)
+
+        # Deal remaining community cards for display purposes
+        while len(self.state.community_cards) < 5:
+            self.state.community_cards.extend(self.deck.deal(1))
+
         for p in active:
             if p.hole_cards and len(self.state.community_cards) >= 3:
                 score = HandEvaluator.evaluate(
                     p.hole_cards, self.state.community_cards
                 )
                 hand_scores[p.player_id] = score
-            player_cards[p.player_id] = list(p.hole_cards)
 
         # Single winner (everyone else folded)
         if len(active) == 1:
