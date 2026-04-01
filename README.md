@@ -9,11 +9,15 @@ PokerClaw 是一个基于大语言模型（LLM）的德州扑克 Agent 竞技平
 **核心特性：**
 - 可配置性格的 LLM Agent（新手/中级/高手 × TAG/LAG/鱼/石头/跟注站/疯子）
 - 现金局模式（Agent 自动对战）
+- 实时观战模式（实时显示发牌、思考过程、下注行为）
 - 完整的牌局回放与 Agent 思维过程展示
-- 回放手牌可见性控制（全显示/全隐藏/单独控制）
+- 回放支持查看所有玩家底牌（包括弃牌玩家）和全部公共牌
+- 每手牌结束后展示各玩家筹码增减
+- Action 详情中显示本轮投入筹码（Round Bet）
+- 无限局数模式 + 手动停止游戏
 - LLM 调用监控（Token、耗时、成功率、P95 延迟）
 - 实时 WebSocket 推送牌局更新
-- 77+ 单元测试覆盖核心逻辑
+- 82+ 单元测试覆盖核心逻辑
 
 ## 技术栈
 
@@ -21,7 +25,7 @@ PokerClaw 是一个基于大语言模型（LLM）的德州扑克 Agent 竞技平
 |------|------|
 | 后端 | Python 3.11+, FastAPI, SQLAlchemy, WebSocket |
 | 数据库 | SQLite |
-| 前端 | React 18, TypeScript, Vite |
+| 前端 | React 19, TypeScript, Vite |
 | 手牌评估 | 自建评估器（10种牌型、7选5比较）|
 | LLM | Anthropic Claude / Mock Provider |
 
@@ -110,15 +114,25 @@ PokerClaw/
 - [x] React + TypeScript + Vite 项目
 - [x] Dashboard（统计概览）
 - [x] Agent 管理（创建/删除/配置）
-- [x] 游戏配置（选择 Agent、设置盲注）
-- [x] 游戏实况（牌桌 UI、WebSocket 更新、操作记录）
-- [x] **回放页面（步骤导航、手牌显示控制）**
+- [x] 游戏配置（选择 Agent、设置盲注、无限局数模式）
+- [x] 游戏实况（实时观战、思考指示、底牌展示、Stop 按钮）
+- [x] **回放页面（步骤导航、手牌显示、筹码变化、Round Bet）**
 - [x] 监控中心（Provider 状态、Agent 指标）
 
 ### Phase 5: 修复与优化 ✅
 - [x] 游戏速度调整（800ms 延迟，可观看）
 - [x] Agent 名字显示修复（display_name 替代 UUID）
 - [x] 回放手牌可见性控制（全显/全隐/单独控制）
+
+### Phase 6: 实时观战增强 ✅
+- [x] WebSocket 实时推送（street_start / player_thinking / player_action / hand_complete）
+- [x] 实时观战页面显示所有玩家底牌（观战模式）
+- [x] 弃牌玩家底牌可见 + 未发公共牌补全显示
+- [x] 每手牌结束后显示各玩家筹码增减
+- [x] Action 详情中显示本轮投入筹码（Round Bet）
+- [x] 无限局数模式 + 手动停止游戏（POST stop 端点）
+- [x] Raise cap 验证测试（最多 4 次加注/轮）
+- [x] 82+ 测试全部通过
 
 ## 待实现功能
 
@@ -158,6 +172,7 @@ python -m pytest backend/tests/test_agent.py -v
 - `POST /api/games` - 创建游戏
 - `GET /api/games/{session_id}` - 获取游戏状态
 - `POST /api/games/{session_id}/start` - 开始游戏
+- `POST /api/games/{session_id}/stop` - 停止游戏（当前手牌完成后停止）
 - `GET /api/games/{session_id}/hands` - 获取手牌记录
 
 ### 回放
@@ -170,7 +185,7 @@ python -m pytest backend/tests/test_agent.py -v
 - `GET /api/monitoring/providers` - Provider 状态
 
 ### WebSocket
-- `WS /ws/games/{session_id}` - 实时游戏更新
+- `WS /ws/game/{session_id}` - 实时游戏更新（hand_start / street_start / player_thinking / player_action / hand_complete）
 
 ## 文档索引
 
@@ -180,6 +195,16 @@ python -m pytest backend/tests/test_agent.py -v
 - [开发进度](PROCESS.md) - 任务跟踪、会话记录
 
 ## 更新日志
+
+### 2026-04-02
+- 新增实时观战模式（WebSocket 推送发牌、思考、下注等所有事件）
+- 弃牌玩家底牌在回放中可见，未发公共牌补全显示
+- 每手牌结束后展示各玩家筹码增减
+- Action 详情中新增 Round Bet（本轮投入筹码）
+- 新增无限局数模式 + 手动停止游戏
+- 新增 Stop Game API 端点
+- 新增 Raise cap 验证测试
+- 82+ 测试全部通过
 
 ### 2026-03-29
 - MVP 完整实现（后端 + 前端）

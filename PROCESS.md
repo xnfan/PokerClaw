@@ -162,6 +162,29 @@ npm run dev -- --host
 - Updated README.md with complete feature documentation
 - Pushed MVP to GitHub: https://github.com/xnfan/PokerClaw
 
+### Session 5 (Live Game Enhancements - 2026-04-02)
+- Real-time streaming via WebSocket:
+  - Added on_action callback to GameRunner
+  - Events: hand_start, street_start, player_thinking, player_action, hand_complete
+  - Frontend GamePlayPage: live action log, thinking indicators, community cards
+- Card visibility fixes:
+  - _resolve() now includes ALL players' hole cards (folded players too)
+  - Deal remaining community cards before result for full board display
+  - ReplayPage: folded players' cards visible, all 5 community cards shown
+- Chip changes per hand:
+  - CashGame captures starting_chips, computes chip_changes delta
+  - Displayed in GamePlayPage (seats) and ReplayPage (summary card)
+- Action detail improvements:
+  - Added Round Bet (本轮投入) to action log and replay detail
+- Multi-hand settings + stop:
+  - GameSetupPage: Set/Unlimited radio toggle
+  - POST /api/games/{session_id}/stop endpoint with asyncio.Event
+  - GamePlayPage: Stop Game button during running games
+- Raise cap validation tests (3 new tests)
+- Chip changes integration tests (2 new tests)
+- Total: 82 tests passing
+- Updated README.md and PROCESS.md
+
 ### Next Session Focus
 - Implement Hand Lab for preset scenario testing
 - Add equity calculation (Monte Carlo)
