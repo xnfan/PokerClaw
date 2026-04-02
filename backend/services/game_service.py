@@ -36,10 +36,11 @@ def get_aggregator() -> MetricsAggregator:
 class GameSession:
     session_id: str
     game: CashGame
-    status: str = "waiting"  # waiting / running / finished
+    status: str = "waiting"  # waiting / pending_start / running / finished
     hand_results: list[dict] = field(default_factory=list)
     on_event: Callable | None = None  # WebSocket broadcast callback
     stop_event: asyncio.Event = field(default_factory=asyncio.Event)
+    _num_hands: int = 10  # store num_hands for deferred start
 
 
 def create_agent_from_db(agent_id: str) -> LLMAgent:
@@ -171,6 +172,19 @@ def stop_game(session_id: str) -> bool:
     if not session:
         return False
     session.stop_event.set()
+    return True
+
+
+def trigger_game_start(session_id: str) -> bool:
+    """Called by WebSocket handler to start the game after on_event is registered.
+    Returns True if game was started, False if already running/finished."""
+    session = _active_games.get(session_id)
+    if not session or session.status != "pending_start":
+        return False
+    if not session.on_event:
+        return False
+    # Launch game as background task
+    asyncio.create_task(run_game(session_id, session._num_hands))
     return True
 
 

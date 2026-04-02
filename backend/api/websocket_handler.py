@@ -27,6 +27,10 @@ async def game_websocket(websocket: WebSocket, session_id: str):
                     pass
         session.on_event = broadcast
 
+        # If game is pending start, trigger it now that callback is registered
+        if session.status == "pending_start":
+            game_service.trigger_game_start(session_id)
+
     try:
         while True:
             data = await websocket.receive_text()

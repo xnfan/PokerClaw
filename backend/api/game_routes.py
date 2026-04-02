@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.services import game_service
@@ -33,16 +33,17 @@ def create_game(body: GameCreate):
 
 
 @router.post("/{session_id}/start")
-async def start_game(session_id: str, background_tasks: BackgroundTasks, num_hands: int = 10):
+async def start_game(session_id: str, num_hands: int = 10):
     session = game_service.get_session(session_id)
     if not session:
         raise HTTPException(404, "Session not found")
     if session.status != "waiting":
         raise HTTPException(400, f"Session is {session.status}, cannot start")
 
-    # Run game in background so the API returns immediately
-    background_tasks.add_task(game_service.run_game, session_id, num_hands)
-    return {"session_id": session_id, "status": "starting", "num_hands": num_hands}
+    # Set pending_start — game will be triggered when WebSocket connects
+    session.status = "pending_start"
+    session._num_hands = num_hands
+    return {"session_id": session_id, "status": "pending_start", "num_hands": num_hands}
 
 
 @router.post("/{session_id}/stop")
