@@ -185,7 +185,7 @@ python -m pytest backend/tests/test_agent.py -v
 - `GET /api/monitoring/providers` - Provider 状态
 
 ### WebSocket
-- `WS /ws/game/{session_id}` - 实时游戏更新（hand_start / street_start / player_thinking / player_action / hand_complete）
+- `WS /ws/game/{session_id}` - 实时游戏更新（hand_start / street_start / player_thinking / player_action / hand_complete / game_finished）
 
 ## 文档索引
 
@@ -196,7 +196,16 @@ python -m pytest backend/tests/test_agent.py -v
 
 ## 更新日志
 
-### 2026-04-02
+### 2026-04-02 (Session 6)
+- 修复实时渲染：hand_start 事件数据解析错误导致底牌不显示（嵌套对象 vs 数组）
+- 修复实时状态管理：新增 handInProgress 标志，正确控制实时/回放切换
+- 修复 Stop Game：stop 路由改为 async、增加状态检查、游戏结束发送 game_finished 事件
+- 修复 All-in 公共牌：重写街道循环逻辑，all-in 时跳过下注但继续发牌
+- 修复回放底牌可见性：统一使用 displayPlayerCards（实时=livePlayerCards，回放=lastHand.player_cards）
+- WebSocket handler 增加日志（broadcast 事件类型、连接/断开、死连接清理）
+- 82 测试全部通过
+
+### 2026-04-02 (Session 5)
 - 新增实时观战模式（WebSocket 推送发牌、思考、下注等所有事件）
 - 弃牌玩家底牌在回放中可见，未发公共牌补全显示
 - 每手牌结束后展示各玩家筹码增减

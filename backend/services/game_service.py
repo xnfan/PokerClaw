@@ -147,6 +147,17 @@ async def run_game(session_id: str, num_hands: int = 10) -> dict:
     )
     session.status = "finished"
 
+    # Notify frontend that game is done
+    if session.on_event:
+        await session.on_event({
+            "type": "game_finished",
+            "data": {
+                "session_id": session_id,
+                "total_hands": result.total_hands,
+                "final_chips": result.final_chips,
+            },
+        })
+
     db = get_db()
     db.execute(
         "UPDATE game_sessions SET status='finished', finished_at=? WHERE session_id=?",
@@ -170,6 +181,8 @@ def stop_game(session_id: str) -> bool:
     """Signal a running game to stop after the current hand."""
     session = _active_games.get(session_id)
     if not session:
+        return False
+    if session.status not in ("running", "pending_start"):
         return False
     session.stop_event.set()
     return True

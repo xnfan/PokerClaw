@@ -109,14 +109,24 @@ class GameRunner:
 
         streets = [Street.PREFLOP, Street.FLOP, Street.TURN, Street.RIVER]
         for street in streets:
-            if len(self.state.active_players) <= 1:
+            active = self.state.active_players  # active = not folded
+            non_allin = self.state.active_non_allin  # can still bet
+
+            # Everyone folded except one — hand is over
+            if len(active) <= 1:
                 break
+
+            # Multiple active but all are all-in (or only 1 can bet) — deal board, skip betting
+            all_committed = len(non_allin) <= 1
+
             self.state.street = street
             if street != Street.PREFLOP:
                 await self._deal_community(street)
                 for p in self.state.players:
                     p.reset_street_bet()
-            if len(self.state.active_non_allin) > 0:
+
+            # Only run betting if there are 2+ players who can act
+            if not all_committed:
                 await self._run_betting_round(street)
 
         return self._resolve()

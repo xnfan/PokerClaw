@@ -185,6 +185,27 @@ npm run dev -- --host
 - Total: 82 tests passing
 - Updated README.md and PROCESS.md
 
+### Session 6 (Critical Bug Fixes - 2026-04-02)
+- Fixed: Real-time rendering broken — hand_start event sent nested objects `{chips, is_active, hole_cards}` but frontend expected `string[]`
+  - Rewrote GamePlayPage WebSocket handler to correctly extract `hole_cards` from nested player data
+  - Added `handInProgress` state flag: true on hand_start, false on hand_complete
+  - `isLive = handInProgress` instead of checking liveActions/thinkingPlayer
+- Fixed: Folded player cards not visible
+  - Unified card display: `displayPlayerCards` selects between livePlayerCards (real-time) and lastHand.player_cards (review)
+  - All players' cards always visible in spectator mode
+- Fixed: Stop Game button not working
+  - `stop_game` route changed to `async def`
+  - Added status validation (only running/pending_start can be stopped)
+  - Added `game_finished` WebSocket event after game loop ends
+  - Frontend handles game_finished to update UI state
+- Fixed: All-in preflop skipped community card dealing
+  - Rewrote street loop: checks `active_players` (not folded) vs `active_non_allin` (can bet)
+  - Multiple active + all committed → deal board cards, skip betting round
+  - Single active player → break (everyone else folded)
+- Added logging to WebSocket handler (broadcast events, connect/disconnect, dead connection cleanup)
+- Files changed: game_runner.py, game_service.py, game_routes.py, websocket_handler.py, GamePlayPage.tsx
+- 82 tests passing, frontend build clean
+
 ### Next Session Focus
 - Implement Hand Lab for preset scenario testing
 - Add equity calculation (Monte Carlo)

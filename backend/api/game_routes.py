@@ -47,7 +47,7 @@ async def start_game(session_id: str, num_hands: int = 10):
 
 
 @router.post("/{session_id}/stop")
-def stop_game(session_id: str):
+async def stop_game(session_id: str):
     success = game_service.stop_game(session_id)
     if not success:
         raise HTTPException(404, "Session not found or not running")
