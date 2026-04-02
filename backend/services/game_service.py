@@ -68,7 +68,7 @@ def create_agent_from_db(agent_id: str) -> LLMAgent:
         }
         # Add delay to simulate LLM thinking and make game watchable
         provider = MockLLMProvider(
-            style=mock_map.get(row["play_style"], "random"), delay_ms=800
+            style=mock_map.get(row["play_style"], "random"), delay_ms=1500
         )
 
     return LLMAgent(
@@ -87,7 +87,10 @@ def create_game(
     buy_in: int = 5000,
 ) -> GameSession:
     """Create a new game session with the given agents."""
-    config = CashGameConfig(small_blind=small_blind, big_blind=big_blind)
+    config = CashGameConfig(
+        small_blind=small_blind, big_blind=big_blind,
+        street_delay_ms=1200.0, hand_delay_ms=2000.0,
+    )
     game = CashGame(config)
     session_id = game.session_id
 

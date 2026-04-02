@@ -1,6 +1,7 @@
 """Execute a single hand of Texas Hold'em."""
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
@@ -66,6 +67,7 @@ class GameRunner:
         big_blind: int = 100,
         dealer_index: int = 0,
         deck_seed: int | None = None,
+        street_delay_ms: float = 0.0,
     ) -> None:
         self.hand_id = str(uuid.uuid4())[:8]
         self.agents = agents
@@ -83,6 +85,7 @@ class GameRunner:
         self._player_names: dict[str, str] = {p.player_id: p.display_name for p in players}
         self.on_action: ActionCallback | None = None
         self.action_history: list[ActionRecord] = []
+        self.street_delay_ms = street_delay_ms
 
     async def run_hand(self) -> HandResult:
         """Run a complete hand and return result."""
@@ -160,12 +163,20 @@ class GameRunner:
 
     def _deal_hole_cards(self) -> None:
         for player in self.state.players:
+            if player.hole_cards:
+                continue  # Preset cards (Hand Lab) — already set
             player.hole_cards = self.deck.deal(2)
 
     async def _deal_community(self, street: Street) -> None:
-        if street == Street.FLOP:
-            self.state.community_cards.extend(self.deck.deal(3))
-        elif street in (Street.TURN, Street.RIVER):
+        # Pause before dealing to let viewer absorb previous street
+        if self.street_delay_ms > 0:
+            await asyncio.sleep(self.street_delay_ms / 1000)
+        current = len(self.state.community_cards)
+        if street == Street.FLOP and current < 3:
+            self.state.community_cards.extend(self.deck.deal(3 - current))
+        elif street == Street.TURN and current < 4:
+            self.state.community_cards.extend(self.deck.deal(1))
+        elif street == Street.RIVER and current < 5:
             self.state.community_cards.extend(self.deck.deal(1))
         if self.on_action:
             await self.on_action({

@@ -5,6 +5,7 @@ import GameSetupPage from './pages/GameSetupPage';
 import GamePlayPage from './pages/GamePlayPage';
 import ReplayPage from './pages/ReplayPage';
 import MonitoringPage from './pages/MonitoringPage';
+import HandLabPage from './pages/HandLabPage';
 import './App.css';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/agents">Agent Management</NavLink>
           <NavLink to="/games/new">New Game</NavLink>
+          <NavLink to="/handlab">Hand Lab</NavLink>
           <NavLink to="/monitoring">Monitoring</NavLink>
         </nav>
         <main className="main-content">
@@ -25,6 +27,7 @@ function App() {
             <Route path="/games/new" element={<GameSetupPage />} />
             <Route path="/games/:sessionId" element={<GamePlayPage />} />
             <Route path="/replay/:handId" element={<ReplayPage />} />
+            <Route path="/handlab" element={<HandLabPage />} />
             <Route path="/monitoring" element={<MonitoringPage />} />
           </Routes>
         </main>

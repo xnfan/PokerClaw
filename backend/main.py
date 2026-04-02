@@ -12,6 +12,8 @@ from backend.api.agent_routes import router as agent_router
 from backend.api.game_routes import router as game_router
 from backend.api.replay_routes import router as replay_router
 from backend.api.monitoring_routes import router as monitoring_router
+from backend.api.equity_routes import router as equity_router
+from backend.api.handlab_routes import router as handlab_router
 from backend.api.websocket_handler import router as ws_router
 
 # Initialize database on startup
@@ -33,6 +35,8 @@ app.include_router(agent_router)
 app.include_router(game_router)
 app.include_router(replay_router)
 app.include_router(monitoring_router)
+app.include_router(equity_router)
+app.include_router(handlab_router)
 app.include_router(ws_router)
 
 

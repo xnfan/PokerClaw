@@ -1,6 +1,7 @@
 """Cash game session manager - runs multiple hands continuously."""
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,8 @@ class CashGameConfig:
     min_buy_in: int = 2000
     max_buy_in: int = 20000
     max_players: int = 9
+    street_delay_ms: float = 0.0
+    hand_delay_ms: float = 0.0
 
 
 @dataclass
@@ -105,6 +108,7 @@ class CashGame:
                 small_blind=self.config.small_blind,
                 big_blind=self.config.big_blind,
                 dealer_index=self.dealer_index % len(hand_players),
+                street_delay_ms=self.config.street_delay_ms,
             )
             # Pass action callback to runner
             if on_action:
@@ -126,6 +130,9 @@ class CashGame:
             self._hand_count += 1
             if on_hand_complete:
                 await on_hand_complete(result)
+            # Pause between hands for watchability
+            if self.config.hand_delay_ms > 0:
+                await asyncio.sleep(self.config.hand_delay_ms / 1000)
 
         return SessionResult(
             session_id=self.session_id,
