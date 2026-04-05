@@ -216,6 +216,185 @@ async def run_game(session_id: str, num_hands: int = 10) -> dict:
     }
 
 
+async def run_lab_game(session_id: str) -> dict:
+    """Run a Hand Lab session: execute hands with preset cards, streaming events via WebSocket."""
+    from backend.services.hand_lab import compute_equity, _build_summary
+    from backend.engine.card import Card
+    from backend.engine.game_runner import GameRunner
+    from backend.engine.game_state import PlayerState
+
+    session = _active_games.get(session_id)
+    if not session or not session.lab_config:
+        raise ValueError(f"Lab session {session_id} not found")
+
+    config = session.lab_config
+    num_hands = session._num_hands
+    session.status = "running"
+
+    # Parse preset cards once
+    preset_hole: dict[str, list[Card]] = {}
+    all_preset_cards: list[Card] = []
+    for p in config.players:
+        if p.hole_cards:
+            cards = [Card.from_string(c) for c in p.hole_cards]
+            preset_hole[p.agent_id] = cards
+            all_preset_cards.extend(cards)
+
+    preset_community = [Card.from_string(c) for c in config.community_cards]
+    all_preset_cards.extend(preset_community)
+
+    name_map: dict[str, str] = {
+        ps.agent_id: _get_agent_name(ps.agent_id) for ps in config.players
+    }
+
+    hand_num = 0
+    all_hand_results: list[dict] = []
+
+    for _ in range(num_hands):
+        if session.stop_event.is_set():
+            break
+
+        hand_num += 1
+        # Capture starting chips
+        starting_chips = {p.player_id: p.chips for p in session.game.players}
+
+        # Prepare players for this hand
+        hand_players = []
+        for p in session.game.players:
+            if p.chips <= 0:
+                continue
+            ps = PlayerState(
+                player_id=p.player_id,
+                display_name=p.display_name,
+                chips=p.chips,
+                seat_index=p.seat_index,
+                hole_cards=list(preset_hole.get(p.player_id, [])),
+            )
+            hand_players.append(ps)
+
+        if len(hand_players) < 2:
+            break
+
+        active_agents = {p.player_id: session.game.agents[p.player_id] for p in hand_players}
+        runner = GameRunner(
+            players=hand_players,
+            agents=active_agents,
+            small_blind=config.small_blind,
+            big_blind=config.big_blind,
+            dealer_index=session.game.dealer_index % len(hand_players),
+            street_delay_ms=session.game.config.street_delay_ms,
+        )
+
+        # Remove preset cards from deck
+        if all_preset_cards:
+            runner.deck.remove_cards(all_preset_cards)
+        # Preset community cards
+        if preset_community:
+            runner.state.community_cards = list(preset_community)
+
+        # Track equity state for this hand
+        folded: set[str] = set()
+        live_player_cards: dict[str, list[Card]] = {}
+
+        async def on_action(event: dict, _folded=folded, _live_cards=live_player_cards, _runner=runner) -> None:
+            etype = event.get("type")
+            data = event.get("data", {})
+
+            if etype == "hand_start":
+                # Collect hole cards for equity
+                for pid, info in data.get("players", {}).items():
+                    for ps in config.players:
+                        if name_map[ps.agent_id] == pid:
+                            hole = info.get("hole_cards", [])
+                            if hole:
+                                _live_cards[ps.agent_id] = [Card.from_string(c) for c in hole]
+                            break
+                # Augment with equity
+                equity = compute_equity(
+                    _live_cards, list(_runner.state.community_cards), _folded, name_map,
+                )
+                event["data"]["equity"] = equity
+
+            elif etype == "street_start":
+                equity = compute_equity(
+                    _live_cards, list(_runner.state.community_cards), _folded, name_map,
+                )
+                event["data"]["equity"] = equity
+
+            elif etype == "player_action":
+                display_pid = data.get("player_id", "")
+                if data.get("action") == "fold":
+                    for ps in config.players:
+                        if name_map[ps.agent_id] == display_pid:
+                            _folded.add(ps.agent_id)
+                            break
+
+            # Broadcast via WebSocket
+            if session.on_event:
+                await session.on_event(event)
+
+        runner.on_action = on_action
+        result = await runner.run_hand()
+
+        # Sync chips back
+        for p in session.game.players:
+            if p.player_id in result.final_chips:
+                p.chips = result.final_chips[p.player_id]
+
+        # Compute chip changes
+        chip_changes = {}
+        for p in session.game.players:
+            start = starting_chips.get(p.player_id, 0)
+            chip_changes[p.player_id] = p.chips - start
+        result.starting_chips = starting_chips
+        result.chip_changes = chip_changes
+
+        session.game.dealer_index = (session.game.dealer_index + 1) % len(session.game.players)
+
+        # Build hand_complete data
+        hand_data = _serialize_hand(result, session_id, hand_num)
+
+        # Add equity to hand_complete
+        final_equity = compute_equity(
+            live_player_cards, list(result.community_cards), folded, name_map,
+        )
+        hand_data["equity"] = final_equity
+
+        session.hand_results.append(hand_data)
+        all_hand_results.append(hand_data)
+
+        if session.on_event:
+            await session.on_event({"type": "hand_complete", "data": hand_data})
+
+        # Reset per-hand tracking for next hand
+        folded.clear()
+        live_player_cards.clear()
+
+        # Pause between hands
+        if session.game.config.hand_delay_ms > 0 and hand_num < num_hands:
+            await asyncio.sleep(session.game.config.hand_delay_ms / 1000)
+
+    # Build summary for multi-run
+    session.status = "finished"
+    player_names = [name_map[ps.agent_id] for ps in config.players]
+    summary = None
+    if num_hands > 1:
+        summary = _build_summary(all_hand_results, player_names)
+
+    if session.on_event:
+        await session.on_event({
+            "type": "lab_finished",
+            "data": {
+                "session_id": session_id,
+                "total_hands": hand_num,
+                "final_chips": {name_map.get(p.player_id, p.player_id): p.chips for p in session.game.players},
+                "summary": summary,
+            },
+        })
+
+    return {"session_id": session_id, "total_hands": hand_num}
+
+
 def get_session(session_id: str) -> GameSession | None:
     return _active_games.get(session_id)
 
@@ -239,8 +418,11 @@ def trigger_game_start(session_id: str) -> bool:
         return False
     if not session.on_event:
         return False
-    # Launch game as background task
-    asyncio.create_task(run_game(session_id, session._num_hands))
+    # Launch game as background task — lab or regular
+    if session.lab_config:
+        asyncio.create_task(run_lab_game(session_id))
+    else:
+        asyncio.create_task(run_game(session_id, session._num_hands))
     return True
 
 
