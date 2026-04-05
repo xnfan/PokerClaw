@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.services.hand_lab import HandLab, PlayerSetup, ScenarioConfig
+from backend.services import game_service
 
 router = APIRouter(prefix="/api/handlab", tags=["handlab"])
 
@@ -27,6 +28,11 @@ class ScenarioRequest(BaseModel):
 class RunMultipleRequest(BaseModel):
     scenario: ScenarioRequest
     count: int = 10
+
+
+class StartLabRequest(BaseModel):
+    scenario: ScenarioRequest
+    count: int = 1
 
 
 def _to_config(body: ScenarioRequest) -> ScenarioConfig:
@@ -65,5 +71,15 @@ async def run_multiple(body: RunMultipleRequest):
         lab = HandLab(config)
         result = await lab.run_multiple(body.count)
         return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/start")
+def start_lab(body: StartLabRequest):
+    try:
+        config = _to_config(body.scenario)
+        session = game_service.start_lab_session(config, count=body.count)
+        return {"session_id": session.session_id}
     except ValueError as e:
         raise HTTPException(400, str(e))

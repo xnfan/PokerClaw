@@ -44,6 +44,8 @@ export const api = {
   // Hand Lab
   runLabOnce: (data: any) => request<any>('/api/handlab/run-once', { method: 'POST', body: JSON.stringify(data) }),
   runLabMultiple: (data: any) => request<any>('/api/handlab/run-multiple', { method: 'POST', body: JSON.stringify(data) }),
+  startLab: (data: { scenario: any; count?: number }) =>
+    request<{ session_id: string }>('/api/handlab/start', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export function createGameWS(sessionId: string): WebSocket {
