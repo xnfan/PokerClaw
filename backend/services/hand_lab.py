@@ -12,6 +12,46 @@ from backend.engine.game_state import PlayerState
 from backend.services.game_service import create_agent_from_db, _get_agent_name
 
 
+def compute_equity(
+    player_cards: dict[str, list[Card]],
+    community: list[Card],
+    folded: set[str],
+    name_map: dict[str, str],
+) -> list[dict]:
+    """Compute equity for active (non-folded) players with known cards."""
+    active_ids = [pid for pid in player_cards if pid not in folded and player_cards[pid]]
+    if len(active_ids) < 2:
+        return [
+            {
+                "player_id": name_map.get(pid, pid),
+                "win_pct": 100.0 if pid in active_ids else 0.0,
+                "tie_pct": 0.0,
+            }
+            for pid in player_cards
+        ]
+
+    active_cards = [player_cards[pid] for pid in active_ids]
+    try:
+        results = EquityCalculator.calculate(active_cards, community, num_simulations=2000)
+    except (ValueError, Exception):
+        return []
+
+    equity = []
+    active_idx = 0
+    for pid in player_cards:
+        if pid in folded or not player_cards[pid]:
+            equity.append({"player_id": name_map.get(pid, pid), "win_pct": 0.0, "tie_pct": 0.0})
+        else:
+            r = results[active_idx]
+            equity.append({
+                "player_id": name_map.get(pid, pid),
+                "win_pct": round(r.win_pct * 100, 1),
+                "tie_pct": round(r.tie_pct * 100, 1),
+            })
+            active_idx += 1
+    return equity
+
+
 @dataclass
 class PlayerSetup:
     agent_id: str
@@ -56,47 +96,8 @@ class HandLab:
         if len(all_cards) != len(set(all_cards)):
             raise ValueError("Duplicate cards in scenario")
 
-    def _compute_equity(
-        self,
-        player_cards: dict[str, list[Card]],
-        community: list[Card],
-        folded: set[str],
-        name_map: dict[str, str],
-    ) -> list[dict]:
-        """Compute equity for active (non-folded) players with known cards."""
-        active_ids = [pid for pid in player_cards if pid not in folded and player_cards[pid]]
-        if len(active_ids) < 2:
-            # Can't compute meaningful equity with < 2 active players
-            return [
-                {
-                    "player_id": name_map.get(pid, pid),
-                    "win_pct": 100.0 if pid in active_ids else 0.0,
-                    "tie_pct": 0.0,
-                }
-                for pid in player_cards
-            ]
-
-        active_cards = [player_cards[pid] for pid in active_ids]
-        try:
-            results = EquityCalculator.calculate(active_cards, community, num_simulations=2000)
-        except (ValueError, Exception):
-            return []
-
-        # Build full equity list including folded players at 0%
-        equity = []
-        active_idx = 0
-        for pid in player_cards:
-            if pid in folded or not player_cards[pid]:
-                equity.append({"player_id": name_map.get(pid, pid), "win_pct": 0.0, "tie_pct": 0.0})
-            else:
-                r = results[active_idx]
-                equity.append({
-                    "player_id": name_map.get(pid, pid),
-                    "win_pct": round(r.win_pct * 100, 1),
-                    "tie_pct": round(r.tie_pct * 100, 1),
-                })
-                active_idx += 1
-        return equity
+    def _compute_equity(self, player_cards, community, folded, name_map):
+        return compute_equity(player_cards, community, folded, name_map)
 
     async def run_once(self) -> dict:
         """Execute the scenario once and return serialized result with step-by-step data."""
