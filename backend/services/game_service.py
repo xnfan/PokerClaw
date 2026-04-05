@@ -5,9 +5,12 @@ import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from backend.agent.llm_agent import LLMAgent
+
+if TYPE_CHECKING:
+    from backend.services.hand_lab import ScenarioConfig
 from backend.agent.personality import PersonalityProfile, PlayStyle, SkillLevel
 from backend.database import get_db, now_iso
 from backend.engine.cash_game import CashGame, CashGameConfig
@@ -41,7 +44,7 @@ class GameSession:
     on_event: Callable | None = None  # WebSocket broadcast callback
     stop_event: asyncio.Event = field(default_factory=asyncio.Event)
     _num_hands: int = 10  # store num_hands for deferred start
-    lab_config: Any = None  # NEW: set for Hand Lab sessions (ScenarioConfig)
+    lab_config: "ScenarioConfig" | None = None  # NEW: set for Hand Lab sessions
 
 
 def create_agent_from_db(agent_id: str) -> LLMAgent:
@@ -113,9 +116,9 @@ def create_game(
     return session
 
 
-def start_lab_session(config: Any, count: int = 1) -> GameSession:
+def start_lab_session(config: "ScenarioConfig", count: int = 1) -> GameSession:
     """Create a Hand Lab session that will stream events via WebSocket."""
-    # Lazy import to avoid circular import
+    # Lazy import to avoid circular import (hand_lab imports from game_service)
     from backend.services.hand_lab import ScenarioConfig
 
     # Build name map
