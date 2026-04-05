@@ -41,6 +41,7 @@ class GameSession:
     on_event: Callable | None = None  # WebSocket broadcast callback
     stop_event: asyncio.Event = field(default_factory=asyncio.Event)
     _num_hands: int = 10  # store num_hands for deferred start
+    lab_config: Any = None  # NEW: set for Hand Lab sessions (ScenarioConfig)
 
 
 def create_agent_from_db(agent_id: str) -> LLMAgent:
@@ -109,6 +110,42 @@ def create_game(
     )
     db.commit()
     db.close()
+    return session
+
+
+def start_lab_session(config: Any, count: int = 1) -> GameSession:
+    """Create a Hand Lab session that will stream events via WebSocket."""
+    # Lazy import to avoid circular import
+    from backend.services.hand_lab import ScenarioConfig
+
+    # Build name map
+    name_map: dict[str, str] = {}
+    for ps in config.players:
+        name_map[ps.agent_id] = _get_agent_name(ps.agent_id)
+
+    # Create CashGame with pacing delays
+    game_config = CashGameConfig(
+        small_blind=config.small_blind,
+        big_blind=config.big_blind,
+        street_delay_ms=1200.0,
+        hand_delay_ms=2000.0,
+    )
+    game = CashGame(game_config)
+    session_id = game.session_id
+
+    # Add players with agents
+    for ps in config.players:
+        agent = create_agent_from_db(ps.agent_id)
+        game.add_player(ps.agent_id, name_map[ps.agent_id], agent, buy_in=ps.chips)
+
+    session = GameSession(
+        session_id=session_id,
+        game=game,
+        status="pending_start",
+        _num_hands=count,
+        lab_config=config,
+    )
+    _active_games[session_id] = session
     return session
 
 
