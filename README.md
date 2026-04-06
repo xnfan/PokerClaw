@@ -15,6 +15,7 @@ PokerClaw 是一个基于大语言模型（LLM）的德州扑克 Agent 竞技平
 - 每手牌结束后展示各玩家筹码增减
 - Action 详情中显示本轮投入筹码（Round Bet）
 - 无限局数模式 + 手动停止游戏
+- **Hand Lab 手牌实验室（实时场景测试，支持预设底牌/公共牌）**
 - LLM 调用监控（Token、耗时、成功率、P95 延迟）
 - 实时 WebSocket 推送牌局更新
 - 82+ 单元测试覆盖核心逻辑
@@ -138,7 +139,7 @@ PokerClaw/
 
 | 模块 | 优先级 | 状态 |
 |------|--------|------|
-| 手牌实验室 (Hand Lab) | P1 | 未开始 |
+| 手牌实验室 (Hand Lab) | P1 | ✅ 已完成 |
 | 人机对战 (Human Agent) | P1 | 未开始 |
 | 锦标赛模式 (Tournament) | P2 | 未开始 |
 | Agent 学习系统 (Learning) | P2 | 未开始 |
@@ -179,13 +180,18 @@ python -m pytest backend/tests/test_agent.py -v
 - `GET /api/replay/sessions/{session_id}` - 获取会话手牌列表
 - `GET /api/replay/hands/{hand_id}` - 获取手牌详情（含 player_cards）
 
+### Hand Lab
+- `POST /api/handlab/run-once` - 运行单次预设场景（同步返回结果）
+- `POST /api/handlab/run-multiple` - 运行多次预设场景（批量统计）
+- `POST /api/handlab/start` - 创建 Hand Lab Session（WebSocket 流式）
+
 ### 监控
 - `GET /api/monitoring/overview` - 全局概览
 - `GET /api/monitoring/agents/{agent_id}` - Agent 指标
 - `GET /api/monitoring/providers` - Provider 状态
 
 ### WebSocket
-- `WS /ws/game/{session_id}` - 实时游戏更新（hand_start / street_start / player_thinking / player_action / hand_complete / game_finished）
+- `WS /ws/game/{session_id}` - 实时游戏更新（hand_start / street_start / player_thinking / player_action / hand_complete / game_finished / lab_finished）
 
 ## 文档索引
 
@@ -195,6 +201,17 @@ python -m pytest backend/tests/test_agent.py -v
 - [开发进度](PROCESS.md) - 任务跟踪、会话记录
 
 ## 更新日志
+
+### 2026-04-07 (Session 7)
+- 新增 Hand Lab 实时流式传输功能
+  - 支持预设底牌和公共牌进行场景测试
+  - WebSocket 实时推送发牌、思考、下注、胜率变化
+  - 多手牌批量运行并生成统计摘要（胜率、平均收益）
+  - 实时胜率条显示（Monte Carlo 计算）
+- 新增 `POST /api/handlab/start` 端点创建 Lab Session
+- 新增 `run_lab_game()` 后台任务处理流式事件
+- HandLabPage 完全重写，支持状态机（setup/live/finished）
+- 新增 Hand Lab 集成测试（3 个测试用例）
 
 ### 2026-04-02 (Session 6)
 - 修复实时渲染：hand_start 事件数据解析错误导致底牌不显示（嵌套对象 vs 数组）

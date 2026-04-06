@@ -73,6 +73,52 @@ Texas Hold'em poker agent platform with LLM-powered agents, hand replay, monitor
 
 None - all planned features for MVP completed.
 
+---
+
+## Session 7: Hand Lab Real-time Streaming (2026-04-07)
+
+### 新增功能
+- **Hand Lab 实时流式传输**：将 Hand Lab 从批量运行改为实时 WebSocket 流式传输
+  - 新增 `POST /api/handlab/start` 端点创建 Lab Session
+  - 新增 `run_lab_game()` 函数处理预设牌面的实时游戏
+  - WebSocket 事件：hand_start, street_start, player_thinking, player_action, hand_complete, lab_finished
+  - 实时显示胜率（Equity）计算
+
+### 技术实现
+- `game_service.py`:
+  - `GameSession` 新增 `lab_config` 字段支持 Hand Lab 配置
+  - `start_lab_session()` 创建 Lab Session
+  - `run_lab_game()` 处理预设牌面并流式传输事件
+  - `trigger_game_start()` 根据 `lab_config` 分发到对应 runner
+
+- `handlab_routes.py`:
+  - 新增 `StartLabRequest` 模型
+  - 新增 `POST /api/handlab/start` 端点
+
+- `HandLabPage.tsx` (完全重写):
+  - 状态机：setup → live → finished
+  - WebSocket 连接实时接收事件
+  - 实时扑克桌显示（公共牌、玩家底牌、胜率条）
+  - 多手牌汇总统计（胜率、平均收益）
+  - 已完成手牌浏览器
+
+### API 变更
+- 新增端点：
+  - `POST /api/handlab/start` - 创建 Hand Lab Session
+  - WebSocket `/ws/game/{session_id}` 支持 Lab 事件
+
+### 文件变更
+- `backend/services/game_service.py` - Lab Session 支持和 run_lab_game
+- `backend/services/hand_lab.py` - compute_equity 提取为模块函数
+- `backend/api/handlab_routes.py` - 新增 start 端点
+- `frontend/src/api/client.ts` - 新增 startLab API
+- `frontend/src/pages/HandLabPage.tsx` - 完全重写为实时流式界面
+- `backend/tests/engine/test_hand_lab.py` - 新增流式测试
+
+### 测试
+- 新增 3 个集成测试验证 Hand Lab 流式功能
+- 全部测试通过
+
 ## Running the Application
 
 ### Backend
@@ -96,10 +142,13 @@ npm run dev -- --host
 
 ## Pending Tasks
 
-### Phase 7: Hand Lab (Scenario Testing)
-- [ ] Preset scenario definitions (premium hands, draws, all-in)
-- [ ] Scenario runner for single-hand testing
-- [ ] Hand Lab UI page
+### Phase 7: Hand Lab (Scenario Testing) ✅
+- [x] Preset scenario definitions (premium hands, draws, all-in)
+- [x] Scenario runner for single-hand and multi-hand testing
+- [x] Hand Lab UI page with real-time streaming
+- [x] WebSocket streaming for Hand Lab (like normal games)
+- [x] Equity calculation (Monte Carlo) displayed in real-time
+- [x] Multi-run summary with win rates and average profit
 
 ### Phase 8: Learning & GTO
 - [ ] Historical summary generation
@@ -207,6 +256,6 @@ npm run dev -- --host
 - 82 tests passing, frontend build clean
 
 ### Next Session Focus
-- Implement Hand Lab for preset scenario testing
-- Add equity calculation (Monte Carlo)
-- Create preflop GTO reference table
+- Human vs Agent gameplay mode
+- Tournament mode with blind increases
+- Agent learning from historical hands
