@@ -16,6 +16,8 @@ PokerClaw 是一个基于大语言模型（LLM）的德州扑克 Agent 竞技平
 - Action 详情中显示本轮投入筹码（Round Bet）
 - 无限局数模式 + 手动停止游戏
 - **Hand Lab 手牌实验室（实时场景测试，支持预设底牌/公共牌）**
+- **人机对战（Human vs AI 模式，人类玩家通过 WebSocket 实时决策）**
+- **Dealer/盲注位置显示（D/SB/BB 标记实时更新）**
 - LLM 调用监控（Token、耗时、成功率、P95 延迟）
 - 实时 WebSocket 推送牌局更新
 - 82+ 单元测试覆盖核心逻辑
@@ -140,7 +142,7 @@ PokerClaw/
 | 模块 | 优先级 | 状态 |
 |------|--------|------|
 | 手牌实验室 (Hand Lab) | P1 | ✅ 已完成 |
-| 人机对战 (Human Agent) | P1 | 未开始 |
+| 人机对战 (Human Agent) | P1 | ✅ 已完成 |
 | 锦标赛模式 (Tournament) | P2 | 未开始 |
 | Agent 学习系统 (Learning) | P2 | 未开始 |
 | GTO 策略辅助 | P2 | 未开始 |
@@ -170,7 +172,8 @@ python -m pytest backend/tests/test_agent.py -v
 
 ### 游戏
 - `GET /api/games` - 列出所有游戏
-- `POST /api/games` - 创建游戏
+- `POST /api/games` - 创建游戏（AI vs AI）
+- `POST /api/games/human` - 创建人机对战游戏
 - `GET /api/games/{session_id}` - 获取游戏状态
 - `POST /api/games/{session_id}/start` - 开始游戏
 - `POST /api/games/{session_id}/stop` - 停止游戏（当前手牌完成后停止）
@@ -191,7 +194,9 @@ python -m pytest backend/tests/test_agent.py -v
 - `GET /api/monitoring/providers` - Provider 状态
 
 ### WebSocket
-- `WS /ws/game/{session_id}` - 实时游戏更新（hand_start / street_start / player_thinking / player_action / hand_complete / game_finished / lab_finished）
+- `WS /ws/game/{session_id}` - 实时游戏更新
+  - 事件：hand_start / street_start / player_thinking / player_action / hand_complete / game_finished / lab_finished
+  - 人机对战：`human_turn`（等待人类决策）、`human_decision`（人类提交决策）
 
 ## 文档索引
 
@@ -201,6 +206,19 @@ python -m pytest backend/tests/test_agent.py -v
 - [开发进度](PROCESS.md) - 任务跟踪、会话记录
 
 ## 更新日志
+
+### 2026-04-08 (Session 8)
+- 新增**人机对战（Human vs AI）**功能
+  - 人类玩家可通过前端界面与 AI Agent 进行实时对战
+  - WebSocket 实时接收人类决策（Fold/Check/Call/Raise/All-in）
+  - 60秒超时自动 Fold
+  - 人类玩家只能看到自己的底牌（观战模式可看所有牌）
+- 新增 Dealer/Blind 位置显示
+  - 每手牌显示庄家[D]、小盲[SB]、大盲[BB]位置标记
+  - 扑克桌显示当前盲注金额
+- 新增 `POST /api/games/human` 端点创建人机对战
+- 新增 HumanAgent 类（backend/agent/human_agent.py）
+- WebSocket 支持 `human_turn` 和 `human_decision` 事件
 
 ### 2026-04-07 (Session 7)
 - 新增 Hand Lab 实时流式传输功能

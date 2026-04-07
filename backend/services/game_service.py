@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
 from backend.agent.llm_agent import LLMAgent
+from backend.agent.human_agent import HumanAgent
 
 if TYPE_CHECKING:
     from backend.services.hand_lab import ScenarioConfig
@@ -45,6 +46,7 @@ class GameSession:
     stop_event: asyncio.Event = field(default_factory=asyncio.Event)
     _num_hands: int = 10  # store num_hands for deferred start
     lab_config: "ScenarioConfig" | None = None  # NEW: set for Hand Lab sessions
+    human_player_id: str | None = None  # NEW: set if human player in game
 
 
 def create_agent_from_db(agent_id: str) -> LLMAgent:
@@ -89,6 +91,7 @@ def create_game(
     small_blind: int = 50,
     big_blind: int = 100,
     buy_in: int = 5000,
+    human_player: dict[str, Any] | None = None,
 ) -> GameSession:
     """Create a new game session with the given agents."""
     config = CashGameConfig(
@@ -98,11 +101,25 @@ def create_game(
     game = CashGame(config)
     session_id = game.session_id
 
+    # Add AI agents
     for aid in agent_ids:
         agent = create_agent_from_db(aid)
         game.add_player(aid, agent.display_name, agent, buy_in=buy_in)
 
-    session = GameSession(session_id=session_id, game=game)
+    # Add human player if specified
+    human_player_id: str | None = None
+    if human_player:
+        human_id = human_player.get("player_id", f"human_{str(uuid.uuid4())[:8]}")
+        human_name = human_player.get("display_name", "Player")
+        human_agent = HumanAgent(human_id, human_name)
+        game.add_player(human_id, human_name, human_agent, buy_in=buy_in)
+        human_player_id = human_id
+
+    session = GameSession(
+        session_id=session_id,
+        game=game,
+        human_player_id=human_player_id,
+    )
     _active_games[session_id] = session
 
     # Persist to DB
@@ -168,6 +185,12 @@ async def run_game(session_id: str, num_hands: int = 10) -> dict:
     db.close()
 
     hand_num = 0
+
+    # Set up human agent callback if there's a human player
+    if session.human_player_id:
+        human_agent = HumanAgent.get_agent(session.human_player_id)
+        if human_agent and session.on_event:
+            human_agent._on_human_turn_callback = session.on_event
 
     async def on_hand_complete(result: HandResult) -> None:
         nonlocal hand_num

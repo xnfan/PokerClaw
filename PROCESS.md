@@ -75,6 +75,72 @@ None - all planned features for MVP completed.
 
 ---
 
+## Session 8: Human vs AI Gameplay (2026-04-08)
+
+### 新增功能
+- **人机对战**：人类玩家通过 WebSocket 与 AI Agent 实时对战
+  - 新增 HumanAgent 类（backend/agent/human_agent.py）
+    - 继承 BaseAgent 接口
+    - asyncio.Future 等待人类决策
+    - 60秒超时自动 FOLD
+  - WebSocket 支持 human_turn 和 human_decision 事件
+  - GameSetupPage 新增"Human vs AI"模式选择
+  - GamePlayPage 新增人类玩家操作界面（Fold/Check/Call/Raise/All-in）
+
+- **Dealer/Blind 位置显示**
+  - hand_start 事件包含 dealer、small_blind、big_blind 位置
+  - 座位显示 [D]/[SB]/[BB] 标记
+  - 扑克桌显示盲注金额
+
+### 技术实现
+- `backend/agent/human_agent.py` (新建):
+  - HumanAgent 类
+  - _registry 类变量管理所有实例
+  - decide() 方法等待人类输入
+  - submit_decision() 方法供 WebSocket 调用
+
+- `backend/services/game_service.py`:
+  - create_game() 支持 human_player 参数
+  - GameSession 新增 human_player_id 字段
+  - run_game() 设置 HumanAgent 回调
+
+- `backend/api/websocket_handler.py`:
+  - 处理 human_decision 消息类型
+  - 验证并提交人类决策
+
+- `backend/api/game_routes.py`:
+  - 新增 POST /api/games/human 端点
+  - HumanGameCreate 请求模型
+
+- `frontend/src/pages/GameSetupPage.tsx`:
+  - 新增游戏模式选择（AI vs AI / Human vs AI）
+  - 新增人类玩家名字输入
+
+- `frontend/src/pages/GamePlayPage.tsx`:
+  - 新增人类玩家操作按钮
+  - 新增倒计时显示
+  - 修复人类玩家只能看自己牌的逻辑
+  - 新增 Dealer/SB/BB 位置标记显示
+
+- `backend/engine/game_runner.py`:
+  - hand_start 事件新增 dealer、small_blind、big_blind 字段
+
+### 文件变更
+- `backend/agent/human_agent.py` - 新建
+- `backend/services/game_service.py` - 修改
+- `backend/api/websocket_handler.py` - 修改
+- `backend/api/game_routes.py` - 修改
+- `frontend/src/pages/GameSetupPage.tsx` - 修改
+- `frontend/src/pages/GamePlayPage.tsx` - 修改
+- `frontend/src/api/client.ts` - 修改
+- `backend/engine/game_runner.py` - 修改
+
+### 测试
+- 后端 API 测试通过
+- 前端编译通过
+
+---
+
 ## Session 7: Hand Lab Real-time Streaming (2026-04-07)
 
 ### 新增功能
@@ -150,18 +216,26 @@ npm run dev -- --host
 - [x] Equity calculation (Monte Carlo) displayed in real-time
 - [x] Multi-run summary with win rates and average profit
 
-### Phase 8: Learning & GTO
+### Phase 8: Human vs AI Gameplay ✅
+- [x] HumanAgent class with WebSocket decision waiting
+- [x] POST /api/games/human endpoint
+- [x] Human player UI with Fold/Check/Call/Raise/All-in
+- [x] Card visibility control (human sees own cards only)
+- [x] 60-second timeout with auto-fold
+- [x] Dealer/SB/BB position display
+
+### Phase 9: Learning & GTO
 - [ ] Historical summary generation
 - [ ] RAG for similar hand lookup
 - [ ] Equity calculation (Monte Carlo)
 - [ ] Preflop GTO table
 
-### Phase 9: Tournament Support
+### Phase 10: Tournament Support
 - [ ] Tournament engine (blind increases, elimination)
 - [ ] Multi-table support
 - [ ] Leaderboard/stats
 
-### Phase 10: Deployment
+### Phase 11: Deployment
 - [ ] Docker configuration
 - [ ] Production build scripts
 - [ ] Documentation updates

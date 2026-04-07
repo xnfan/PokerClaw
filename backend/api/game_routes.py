@@ -18,6 +18,15 @@ class GameCreate(BaseModel):
     num_hands: int = 10
 
 
+class HumanGameCreate(BaseModel):
+    agent_ids: list[str]
+    human_name: str = "Player"
+    small_blind: int = 50
+    big_blind: int = 100
+    buy_in: int = 5000
+    num_hands: int = 10
+
+
 @router.post("")
 def create_game(body: GameCreate):
     try:
@@ -71,6 +80,7 @@ def get_game(session_id: str):
         "current_chips": {
             p.display_name: p.chips for p in session.game.players
         },
+        "human_player_id": session.human_player_id,
     }
 
 
@@ -80,3 +90,27 @@ def get_game_hands(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
     return session.hand_results
+
+
+@router.post("/human")
+def create_human_game(body: HumanGameCreate):
+    """Create a game with a human player vs AI agents."""
+    try:
+        human_player = {
+            "player_id": f"human_{body.human_name.lower().replace(' ', '_')}",
+            "display_name": body.human_name,
+        }
+        session = game_service.create_game(
+            agent_ids=body.agent_ids,
+            small_blind=body.small_blind,
+            big_blind=body.big_blind,
+            buy_in=body.buy_in,
+            human_player=human_player,
+        )
+        return {
+            "session_id": session.session_id,
+            "status": session.status,
+            "human_player_id": session.human_player_id,
+        }
+    except ValueError as e:
+        raise HTTPException(400, str(e))

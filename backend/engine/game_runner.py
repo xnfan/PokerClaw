@@ -92,6 +92,19 @@ class GameRunner:
         self._post_blinds()
         self._deal_hole_cards()
 
+        # Calculate dealer, SB, BB positions
+        n = len(self.state.players)
+        dealer_idx = self.state.dealer_index
+        sb_idx = (dealer_idx + 1) % n
+        bb_idx = (dealer_idx + 2) % n
+        if n == 2:  # Heads-up
+            sb_idx = dealer_idx
+            bb_idx = (dealer_idx + 1) % n
+
+        dealer_name = self._player_names.get(self.state.players[dealer_idx].player_id, "")
+        sb_name = self._player_names.get(self.state.players[sb_idx].player_id, "")
+        bb_name = self._player_names.get(self.state.players[bb_idx].player_id, "")
+
         # Emit hand_start event (spectator mode — show all hole cards)
         if self.on_action:
             await self.on_action({
@@ -107,6 +120,11 @@ class GameRunner:
                         for p in self.state.players
                     },
                     "pot": self.state.pot_manager.total_pot,
+                    "dealer": dealer_name,
+                    "small_blind": sb_name,
+                    "big_blind": bb_name,
+                    "small_blind_amount": self.state.small_blind,
+                    "big_blind_amount": self.state.big_blind,
                 },
             })
 

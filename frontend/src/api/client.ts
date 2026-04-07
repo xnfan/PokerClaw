@@ -46,6 +46,10 @@ export const api = {
   runLabMultiple: (data: any) => request<any>('/api/handlab/run-multiple', { method: 'POST', body: JSON.stringify(data) }),
   startLab: (data: { scenario: any; count?: number }) =>
     request<{ session_id: string }>('/api/handlab/start', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Human vs AI
+  createHumanGame: (data: { agent_ids: string[]; human_name: string; small_blind?: number; big_blind?: number; buy_in?: number; num_hands?: number }) =>
+    request<{ session_id: string; human_player_id: string }>('/api/games/human', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export function createGameWS(sessionId: string): WebSocket {

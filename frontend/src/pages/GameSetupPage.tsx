@@ -9,6 +9,8 @@ export default function GameSetupPage() {
   const [config, setConfig] = useState({ small_blind: 50, big_blind: 100, buy_in: 5000, num_hands: 10 });
   const [unlimited, setUnlimited] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [gameMode, setGameMode] = useState<'ai-only' | 'human-vs-ai'>('ai-only');
+  const [humanName, setHumanName] = useState('Player');
 
   useEffect(() => { api.listAgents().then(setAgents).catch(() => {}); }, []);
 
@@ -17,13 +19,25 @@ export default function GameSetupPage() {
   };
 
   const handleStart = async () => {
-    if (selected.length < 2) { alert('Select at least 2 agents'); return; }
+    if (gameMode === 'ai-only' && selected.length < 2) { alert('Select at least 2 agents'); return; }
+    if (gameMode === 'human-vs-ai' && selected.length < 1) { alert('Select at least 1 AI opponent'); return; }
     setLoading(true);
     try {
       const numHands = unlimited ? 999999 : config.num_hands;
-      const { session_id } = await api.createGame({ agent_ids: selected, ...config });
-      await api.startGame(session_id, numHands);
-      navigate(`/games/${session_id}`);
+      if (gameMode === 'human-vs-ai') {
+        const { session_id } = await api.createHumanGame({
+          agent_ids: selected,
+          human_name: humanName,
+          ...config,
+          num_hands: numHands,
+        });
+        await api.startGame(session_id, numHands);
+        navigate(`/games/${session_id}?human=true`);
+      } else {
+        const { session_id } = await api.createGame({ agent_ids: selected, ...config });
+        await api.startGame(session_id, numHands);
+        navigate(`/games/${session_id}`);
+      }
     } catch (e: any) { alert(e.message); }
     setLoading(false);
   };
@@ -31,6 +45,41 @@ export default function GameSetupPage() {
   return (
     <div>
       <h1 className="page-title">New Game</h1>
+
+      <div className="card">
+        <h2>Game Mode</h2>
+        <div style={{display: 'flex', gap: 16, marginBottom: 16}}>
+          <label style={{display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer'}}>
+            <input
+              type="radio"
+              checked={gameMode === 'ai-only'}
+              onChange={() => setGameMode('ai-only')}
+            />
+            <span>AI vs AI (Spectator)</span>
+          </label>
+          <label style={{display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer'}}>
+            <input
+              type="radio"
+              checked={gameMode === 'human-vs-ai'}
+              onChange={() => setGameMode('human-vs-ai')}
+            />
+            <span>Human vs AI</span>
+          </label>
+        </div>
+
+        {gameMode === 'human-vs-ai' && (
+          <div style={{marginBottom: 16}}>
+            <label>Your Name</label>
+            <input
+              type="text"
+              value={humanName}
+              onChange={e => setHumanName(e.target.value)}
+              placeholder="Enter your name"
+              style={{width: 200}}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="card">
         <h2>Game Settings</h2>
@@ -71,7 +120,7 @@ export default function GameSetupPage() {
       </div>
 
       <div className="card">
-        <h2>Select Agents ({selected.length} selected)</h2>
+        <h2>{gameMode === 'human-vs-ai' ? 'Select AI Opponents' : 'Select Agents'} ({selected.length} selected)</h2>
         {agents.length === 0 ? (
           <p className="empty-state">No agents available. <a href="/agents" style={{color:'#22d3ee'}}>Create agents first</a>.</p>
         ) : (
@@ -92,9 +141,9 @@ export default function GameSetupPage() {
         )}
       </div>
 
-      <button className="btn btn-primary" onClick={handleStart} disabled={loading || selected.length < 2}
+      <button className="btn btn-primary" onClick={handleStart} disabled={loading || (gameMode === 'ai-only' ? selected.length < 2 : selected.length < 1)}
         style={{fontSize:'1rem', padding:'12px 32px'}}>
-        {loading ? 'Starting...' : `Start Game (${selected.length} players)`}
+        {loading ? 'Starting...' : `Start Game (${gameMode === 'human-vs-ai' ? selected.length + 1 : selected.length} players)`}
       </button>
     </div>
   );
